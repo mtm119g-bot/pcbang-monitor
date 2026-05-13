@@ -826,21 +826,33 @@ function runScan(){
 }
 
 // ── 시작/정지 ─────────────────────────────────────
-document.getElementById('btn-start').addEventListener('click',function(){saveBizToServer();requestServerScan();
-  buildHosts();
-  if(!G.hosts.length){alert('설정 탭에서 IP를 입력해주세요!');return;}
-  G.running=true;
-  document.getElementById('btn-start').style.display='none';
-  document.getElementById('btn-stop').style.display='';
-  document.getElementById('hd-st').innerHTML='<span class="pulse" style="color:var(--ac2)">● 스캔중</span>';
-  var iv=parseInt(document.getElementById('iv').value);
-  var lbl=document.getElementById('iv').options[document.getElementById('iv').selectedIndex].text;
-  var badge=document.getElementById('iv-badge');
-  badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
-  runScan().then(function(){startCD(iv);});
-  G.ivId=setInterval(function(){G.nextScan=Date.now()+iv;runScan();},iv);
-  startCD(iv);
+document.getElementById('btn-start').addEventListener('click',function(){
+  // 서버에서 최신 업체 불러온 후 시작
+  authFetch('/api/biz')
+    .then(function(r){return r.json();})
+    .then(function(list){
+      if(list&&list.length){
+        G.bizList=list.map(function(b){return {id:b._id,name:b.name,color:b.color,ipRange:b.ipRange};});
+        G.bizSeq=G.bizList.length;
+        renderBizList();
+      }
+      saveBizToServer();requestServerScan();
+      buildHosts();
+      if(!G.hosts.length){alert('설정 탭에서 IP를 입력하고 저장해주세요!');return;}
+      G.running=true;
+      document.getElementById('btn-start').style.display='none';
+      document.getElementById('btn-stop').style.display='';
+      document.getElementById('hd-st').innerHTML='<span class="pulse" style="color:var(--ac2)">● 스캔중</span>';
+      var iv=parseInt(document.getElementById('iv').value);
+      var lbl=document.getElementById('iv').options[document.getElementById('iv').selectedIndex].text;
+      var badge=document.getElementById('iv-badge');
+      badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
+      runScan().then(function(){startCD(iv);});
+      G.ivId=setInterval(function(){G.nextScan=Date.now()+iv;runScan();},iv);
+      startCD(iv);
+    });
 });
+
 document.getElementById('btn-stop').addEventListener('click',function(){
   G.running=false;clearInterval(G.ivId);G.ivId=null;clearInterval(G.cdId);G.cdId=null;
   document.getElementById('btn-start').style.display='';document.getElementById('btn-stop').style.display='none';

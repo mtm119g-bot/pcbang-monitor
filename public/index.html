@@ -153,9 +153,81 @@ canvas{display:block;}
 
 .empty{text-align:center;padding:36px 16px;color:var(--tx2);}
 .empty .ei{font-size:30px;margin-bottom:8px;}
+
+/* 로그인 */
+.auth-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);padding:20px;}
+.auth-box{background:var(--bg2);border:1px solid var(--bd);border-radius:16px;padding:32px 28px;width:100%;max-width:380px;}
+.auth-logo{text-align:center;font-size:22px;font-weight:900;color:var(--ac);margin-bottom:6px;}
+.auth-sub{text-align:center;font-size:12px;color:var(--tx2);margin-bottom:24px;}
+.auth-form{display:flex;flex-direction:column;gap:14px;}
+.auth-inp{width:100%;padding:10px 12px;font-size:13px;}
+.auth-btn{padding:11px;border-radius:8px;border:none;font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:700;background:var(--ac);color:#000;width:100%;}
+.auth-btn:active{transform:scale(.98);}
+.auth-err{color:var(--err);font-size:12px;text-align:center;min-height:18px;}
+.auth-link{text-align:center;font-size:12px;color:var(--tx2);margin-top:12px;}
+.auth-link span{color:var(--ac);cursor:pointer;}
+/* 사용자 정보 바 */
+.user-bar{background:var(--bg2);border-bottom:1px solid var(--bd);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;font-size:11px;}
+.user-name{color:var(--ac);font-weight:700;}
+.user-btns{display:flex;gap:6px;}
+.ubtn{padding:3px 9px;border-radius:4px;border:1px solid var(--bd);background:transparent;color:var(--tx2);font-size:11px;font-family:'Noto Sans KR',sans-serif;}
+/* 관리자 */
+.admin-wrap{padding:12px 14px;}
+.admin-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+@media(orientation:landscape){.admin-cards{grid-template-columns:repeat(4,1fr);}}
+.admin-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.admin-tbl th{padding:7px 10px;text-align:left;font-size:10px;color:var(--tx2);background:var(--bg3);text-transform:uppercase;white-space:nowrap;}
+.admin-tbl td{padding:7px 10px;border-bottom:1px solid rgba(30,58,95,.3);white-space:nowrap;}
+.admin-tbl tr:last-child td{border-bottom:none;}
+.badge-on{background:rgba(0,255,136,.15);color:var(--ac2);border-radius:4px;padding:2px 6px;font-size:10px;}
+.badge-off{background:rgba(255,68,85,.15);color:var(--err);border-radius:4px;padding:2px 6px;font-size:10px;}
+.badge-stop{background:rgba(148,163,184,.15);color:var(--tx2);border-radius:4px;padding:2px 6px;font-size:10px;}
+
 </style>
 </head>
 <body>
+
+<!-- 로그인 화면 -->
+<div id="auth-screen" style="display:none">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="auth-logo">PC방 MONITOR</div>
+      <div class="auth-sub">PC방 멀티 핑 모니터링 시스템</div>
+      <!-- 로그인 폼 -->
+      <div id="login-form">
+        <div class="auth-form">
+          <div><lbl>아이디</lbl><input type="text" class="auth-inp" id="login-id" placeholder="아이디 입력"></div>
+          <div><lbl>비밀번호</lbl><input type="password" class="auth-inp" id="login-pw" placeholder="비밀번호 입력"></div>
+          <div class="auth-err" id="login-err"></div>
+          <button class="auth-btn" id="login-btn">로그인</button>
+        </div>
+        <div class="auth-link">계정이 없으신가요? <span id="goto-register">회원가입</span></div>
+      </div>
+      <!-- 회원가입 폼 -->
+      <div id="register-form" style="display:none">
+        <div class="auth-form">
+          <div><lbl>이름</lbl><input type="text" class="auth-inp" id="reg-name" placeholder="이름 입력"></div>
+          <div><lbl>아이디</lbl><input type="text" class="auth-inp" id="reg-id" placeholder="아이디 입력 (4자 이상)"></div>
+          <div><lbl>비밀번호</lbl><input type="password" class="auth-inp" id="reg-pw" placeholder="비밀번호 입력 (4자 이상)"></div>
+          <div><lbl>비밀번호 확인</lbl><input type="password" class="auth-inp" id="reg-pw2" placeholder="비밀번호 재입력"></div>
+          <div class="auth-err" id="reg-err"></div>
+          <button class="auth-btn" id="reg-btn">회원가입</button>
+        </div>
+        <div class="auth-link">이미 계정이 있으신가요? <span id="goto-login">로그인</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 사용자 정보 바 -->
+<div id="user-bar" style="display:none" class="user-bar">
+  <div>👤 <span class="user-name" id="user-name-txt"></span> 님</div>
+  <div class="user-btns">
+    <button class="ubtn" id="btn-change-pw">비밀번호 변경</button>
+    <button class="ubtn" id="btn-logout" style="color:var(--err)">로그아웃</button>
+  </div>
+</div>
+
 <div class="tip" id="tip"></div>
 
 <header>
@@ -171,6 +243,7 @@ canvas{display:block;}
     <div class="pill" id="iv-badge" style="display:none"></div>
   </div>
 </header>
+<div id="main-app" style="display:none">
 <div class="prog"><div class="prog-f" id="prog"></div></div>
 
 <!-- 자동검색 바 -->
@@ -230,6 +303,7 @@ canvas{display:block;}
   <button class="tab" data-tab="stats">📊 통계</button>
   <button class="tab" data-tab="sales">💰 매출</button>
   <button class="tab" data-tab="settings">⚙️ 설정</button>
+  <button class="tab" id="tab-admin-btn" data-tab="admin" style="display:none">🔧 관리자</button>
 </div>
 
 <!-- 실시간 모니터 -->
@@ -323,6 +397,28 @@ canvas{display:block;}
       <button class="btn bg bsm" id="btn-open-sample">샘플 IP</button>
     </div>
     <div class="biz-list" id="biz-list"></div>
+  </div>
+</div>
+
+
+<!-- 관리자 탭 -->
+<div id="tab-admin" style="display:none">
+  <div class="admin-wrap">
+    <div class="admin-cards" id="admin-stat-cards"></div>
+    <div class="sec">
+      <div class="sec-t">👥 전체 회원 목록</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table class="admin-tbl">
+          <thead>
+            <tr>
+              <th>아이디</th><th>이름</th><th>업체수</th>
+              <th>자동스캔</th><th>마지막 로그인</th><th>상태</th><th>관리</th>
+            </tr>
+          </thead>
+          <tbody id="admin-user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -615,11 +711,12 @@ document.querySelectorAll('.tab').forEach(function(btn){
     document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
     btn.classList.add('on');
     var tab=btn.dataset.tab;
-    ['monitor','stats','sales','settings'].forEach(function(t){
+    ['monitor','stats','sales','settings','admin'].forEach(function(t){
       document.getElementById('tab-'+t).style.display=t===tab?'':'none';
     });
     if(tab==='sales')initSalesTab();
     if(tab==='settings')renderBizList();
+    if(tab==='admin')loadAdminData();
   });
 });
 
@@ -927,7 +1024,7 @@ var serverMode = true;
 
 // 서버에서 결과 가져오기
 function fetchResults() {
-  fetch(SERVER_URL + '/api/results')
+  authFetch(SERVER_URL + '/api/results')
     .then(function(r){ return r.json(); })
     .then(function(data){
       // 서버 결과를 G.hosts 형태로 변환
@@ -949,7 +1046,7 @@ function fetchResults() {
 
 // 서버에 업체 저장
 function saveBizToServer() {
-  fetch(SERVER_URL + '/api/biz', {
+  authFetch(SERVER_URL + '/api/biz', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bizList: G.bizList })
@@ -959,7 +1056,7 @@ function saveBizToServer() {
 
 // 서버 자동스캔 설정
 function setServerAutoScan(intervalMs) {
-  fetch(SERVER_URL + '/api/auto-scan', {
+  authFetch(SERVER_URL + '/api/auto-scan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ intervalMs: intervalMs })
@@ -969,7 +1066,7 @@ function setServerAutoScan(intervalMs) {
 
 // 수동 스캔 요청
 function requestServerScan() {
-  fetch(SERVER_URL + '/api/scan', { method: 'POST' });
+  authFetch(SERVER_URL + '/api/scan', { method: 'POST' });
 }
 
 // 서버 통계 가져오기
@@ -994,6 +1091,206 @@ document.getElementById('st-month').value=m;
 document.getElementById('sa-month').value=m;
 // 자동검색 OFF 버튼 기본 선택
 document.querySelector('[data-auto="off"]').classList.add('on');
+</script>
+</div><!-- main-app -->
+<script>
+
+// ── 인증 시스템 ────────────────────────────────────
+var TOKEN_KEY = 'pcbang_token';
+var currentUser = null;
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
+function removeToken() { localStorage.removeItem(TOKEN_KEY); }
+
+function authFetch(url, options) {
+  options = options || {};
+  options.headers = options.headers || {};
+  options.headers['Content-Type'] = 'application/json';
+  var token = getToken();
+  if (token) options.headers['Authorization'] = 'Bearer ' + token;
+  return fetch(url, options);
+}
+
+function showAuth() {
+  document.getElementById('auth-screen').style.display = '';
+  document.getElementById('user-bar').style.display = 'none';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+function showApp(user) {
+  currentUser = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('user-bar').style.display = '';
+  document.getElementById('main-app').style.display = '';
+  document.getElementById('user-name-txt').textContent = user.name;
+  if (user.role === 'admin') {
+    document.getElementById('tab-admin-btn').style.display = '';
+  }
+  // 서버에서 업체 로드
+  loadBizFromServer();
+}
+
+function loadBizFromServer() {
+  authFetch('/api/biz')
+    .then(function(r){ return r.json(); })
+    .then(function(list){
+      G.bizList = list.map(function(b){ return {id:b._id, name:b.name, color:b.color, ipRange:b.ipRange}; });
+      G.bizSeq = G.bizList.length;
+      renderBizList();
+      renderMonitor();
+    });
+}
+
+// 로그인
+document.getElementById('login-btn').addEventListener('click', function(){
+  var id = document.getElementById('login-id').value.trim();
+  var pw = document.getElementById('login-pw').value;
+  var errEl = document.getElementById('login-err');
+  errEl.textContent = '';
+  if (!id || !pw) { errEl.textContent = '아이디와 비밀번호를 입력해주세요'; return; }
+  fetch('/api/auth/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:id, password:pw})
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    if (data.error) { errEl.textContent = data.error; return; }
+    setToken(data.token);
+    showApp(data.user);
+  });
+});
+
+// 엔터키 로그인
+document.getElementById('login-pw').addEventListener('keydown', function(e){
+  if(e.key==='Enter') document.getElementById('login-btn').click();
+});
+
+// 회원가입
+document.getElementById('reg-btn').addEventListener('click', function(){
+  var name = document.getElementById('reg-name').value.trim();
+  var id = document.getElementById('reg-id').value.trim();
+  var pw = document.getElementById('reg-pw').value;
+  var pw2 = document.getElementById('reg-pw2').value;
+  var errEl = document.getElementById('reg-err');
+  errEl.textContent = '';
+  if (!name||!id||!pw||!pw2) { errEl.textContent = '모든 항목을 입력해주세요'; return; }
+  if (pw !== pw2) { errEl.textContent = '비밀번호가 일치하지 않습니다'; return; }
+  if (id.length < 4) { errEl.textContent = '아이디는 4자 이상이어야 합니다'; return; }
+  if (pw.length < 4) { errEl.textContent = '비밀번호는 4자 이상이어야 합니다'; return; }
+  fetch('/api/auth/register', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username:id, password:pw, name:name})
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    if (data.error) { errEl.textContent = data.error; return; }
+    setToken(data.token);
+    showApp(data.user);
+  });
+});
+
+// 폼 전환
+document.getElementById('goto-register').addEventListener('click', function(){
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('register-form').style.display = '';
+});
+document.getElementById('goto-login').addEventListener('click', function(){
+  document.getElementById('register-form').style.display = 'none';
+  document.getElementById('login-form').style.display = '';
+});
+
+// 로그아웃
+document.getElementById('btn-logout').addEventListener('click', function(){
+  if (!confirm('로그아웃 하시겠습니까?')) return;
+  removeToken(); currentUser = null;
+  stopMonitor();
+  showAuth();
+});
+
+// 비밀번호 변경
+document.getElementById('btn-change-pw').addEventListener('click', function(){
+  var oldPw = prompt('현재 비밀번호:');
+  if (!oldPw) return;
+  var newPw = prompt('새 비밀번호 (4자 이상):');
+  if (!newPw) return;
+  authFetch('/api/auth/password', {
+    method:'PUT', body:JSON.stringify({oldPassword:oldPw, newPassword:newPw})
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    if (data.error) { alert(data.error); return; }
+    alert('비밀번호가 변경되었습니다!');
+  });
+});
+
+// ── 관리자 기능 ────────────────────────────────────
+function loadAdminData() {
+  authFetch('/api/admin/stats')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      document.getElementById('admin-stat-cards').innerHTML =
+        '<div class="card"><div class="card-l">전체 회원</div><div class="card-v c-ac">'+data.totalUsers+'명</div></div>'+
+        '<div class="card"><div class="card-l">활성 회원</div><div class="card-v c-ac2">'+data.activeUsers+'명</div></div>'+
+        '<div class="card"><div class="card-l">전체 업체</div><div class="card-v c-warn">'+data.totalBiz+'개</div></div>'+
+        '<div class="card"><div class="card-l">자동스캔 중</div><div class="card-v c-ac">'+data.scanning+'명</div></div>';
+    });
+  authFetch('/api/admin/users')
+    .then(function(r){ return r.json(); })
+    .then(function(users){
+      var tbody = document.getElementById('admin-user-tbody');
+      tbody.innerHTML = users.map(function(u){
+        var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString('ko-KR') : '-';
+        var statusBadge = u.isActive ? '<span class="badge-on">활성</span>' : '<span class="badge-off">정지</span>';
+        var scanBadge = u.intervalMs>0 ? '<span class="badge-on">'+u.intervalMs/60000+'분</span>' : '<span class="badge-stop">OFF</span>';
+        var btns = u.role==='admin' ? '<span style="color:var(--ac);font-size:10px">관리자</span>' :
+          '<button class="ubtn" onclick="toggleUser(''+u._id+'')">'+( u.isActive?'정지':'활성')+'</button>'+
+          '<button class="ubtn" onclick="resetPw(''+u._id+'')">PW초기화</button>'+
+          '<button class="ubtn" style="color:var(--err)" onclick="deleteUser(''+u._id+'',''+u.name+'')">삭제</button>';
+        return '<tr>'
+          +'<td style="color:var(--ac)">'+u.username+'</td>'
+          +'<td>'+u.name+'</td>'
+          +'<td style="text-align:center">'+u.bizCount+'개</td>'
+          +'<td>'+scanBadge+'</td>'
+          +'<td style="color:var(--tx2);font-size:10px">'+lastLogin+'</td>'
+          +'<td>'+statusBadge+'</td>'
+          +'<td style="display:flex;gap:4px">'+btns+'</td>'
+          +'</tr>';
+      }).join('');
+    });
+}
+
+function toggleUser(id){
+  authFetch('/api/admin/users/'+id+'/toggle', {method:'PUT'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){ if(data.ok) loadAdminData(); else alert(data.error); });
+}
+function resetPw(id){
+  var newPw = prompt('새 비밀번호 입력 (4자 이상):');
+  if (!newPw) return;
+  authFetch('/api/admin/users/'+id+'/password', {method:'PUT', body:JSON.stringify({newPassword:newPw})})
+    .then(function(r){ return r.json(); })
+    .then(function(data){ alert(data.ok?'비밀번호가 초기화되었습니다':data.error); });
+}
+function deleteUser(id, name){
+  if (!confirm(name+'님을 삭제하시겠습니까? 모든 데이터가 삭제됩니다.')) return;
+  authFetch('/api/admin/users/'+id, {method:'DELETE'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){ if(data.ok) loadAdminData(); else alert(data.error); });
+}
+
+// ── 앱 초기화 ──────────────────────────────────────
+var token = getToken();
+if (token) {
+  authFetch('/api/auth/me')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data.error) { showAuth(); return; }
+      showApp(data);
+    })
+    .catch(function(){ showAuth(); });
+} else {
+  showAuth();
+}
+
+
 </script>
 </body>
 </html>

@@ -753,7 +753,7 @@ function addBiz(name,color,ipRange){
 }
 function removeBiz(id){
   if(G.bizList.length<=1){alert('최소 1개 업체가 필요합니다.');return;}
-  G.bizList=G.bizList.filter(function(b){return b.id!==id;});renderBizList();
+  G.bizList=G.bizList.filter(function(b){return String(b.id)!==String(id);});renderBizList();
 }
 function renderBizList(){
   var el=document.getElementById('biz-list');
@@ -774,14 +774,14 @@ function renderBizList(){
   renderSalesSettings();
 }
 document.getElementById('biz-list').addEventListener('change',function(e){
-  var t=e.target,id=parseInt(t.dataset.id),f=t.dataset.f;
+  var t=e.target,id=t.dataset.id,f=t.dataset.f;
   if(!id||!f)return;
-  var b=G.bizList.find(function(x){return x.id===id;});
+  var b=G.bizList.find(function(x){return String(x.id)===String(id);});
   if(b){b[f]=t.value;if(f==='name'||f==='color')renderBizList();}
 });
 document.getElementById('biz-list').addEventListener('click',function(e){
   var t=e.target.closest('[data-del]');
-  if(t)removeBiz(parseInt(t.dataset.del));
+  if(t)removeBiz(t.dataset.del);
 });
 
 // ── 핑 체크 ────────────────────────────────────────

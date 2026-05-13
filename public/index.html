@@ -847,14 +847,25 @@ document.getElementById('btn-start').addEventListener('click',function(){
       var lbl=document.getElementById('iv').options[document.getElementById('iv').selectedIndex].text;
       var badge=document.getElementById('iv-badge');
       badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
-      runScan().then(function(){startCD(iv);});
-      G.ivId=setInterval(function(){G.nextScan=Date.now()+iv;runScan();},iv);
+      // 브라우저 직접 핑 대신 서버에 스캔 요청
+      requestServerScan();
       startCD(iv);
+      // 서버 자동스캔도 설정
+      authFetch(SERVER_URL + '/api/auto-scan', {
+        method: 'POST',
+        body: JSON.stringify({intervalMs: iv})
+      });
+      // 5초마다 결과 폴링
+      G.ivId = setInterval(function(){
+        G.nextScan = Date.now() + iv;
+        fetchResults();
+      }, 5000);
     });
 });
 
 document.getElementById('btn-stop').addEventListener('click',function(){
   G.running=false;clearInterval(G.ivId);G.ivId=null;clearInterval(G.cdId);G.cdId=null;
+  authFetch(SERVER_URL + '/api/auto-scan', {method:'POST', body:JSON.stringify({intervalMs:0})});
   document.getElementById('btn-start').style.display='';document.getElementById('btn-stop').style.display='none';
   document.getElementById('hd-st').textContent='정지됨';
   document.getElementById('iv-badge').style.display='none';
@@ -1262,21 +1273,43 @@ var serverMode = true;
 
 // 서버에서 결과 가져오기
 function fetchResults() {
+  if(!G.running) return;
   authFetch(SERVER_URL + '/api/results')
     .then(function(r){ return r.json(); })
     .then(function(data){
-      // 서버 결과를 G.hosts 형태로 변환
+      if(!data.results) return;
       G.hosts = [];
       var idx = 1;
       data.results.forEach(function(bd){
+        if(!bd.biz) return;
         bd.results.forEach(function(r){
           G.hosts.push({
-            idx: idx++, ip: r.ip, bizId: bd.biz.id, bizName: bd.biz.name, bizColor: bd.biz.color,
-            status: r.status || 'pending', ping: r.ping, lastCheck: r.lastCheck ? new Date(r.lastCheck) : null,
-            history: [], attempts: 1, successes: r.status === 'online' || r.status === 'warn' ? 1 : 0
+            idx: idx++,
+            ip: r.ip,
+            bizId: String(bd.biz._id || bd.biz.id),
+            bizName: bd.biz.name,
+            bizColor: bd.biz.color,
+            status: r.status || 'pending',
+            ping: r.ping,
+            lastCheck: r.lastCheck ? new Date(r.lastCheck) : null,
+            history: [],
+            attempts: 1,
+            successes: (r.status === 'online' || r.status === 'warn') ? 1 : 0
           });
         });
       });
+      // G.bizList도 서버 결과로 업데이트
+      if(data.results.length > 0) {
+        var newBizList = data.results.map(function(bd){
+          return {
+            id: String(bd.biz._id || bd.biz.id),
+            name: bd.biz.name,
+            color: bd.biz.color,
+            ipRange: bd.biz.ipRange || ''
+          };
+        });
+        if(newBizList.length > 0) G.bizList = newBizList;
+      }
       renderMonitor();
     })
     .catch(function(e){ console.log('서버 연결 실패:', e); });

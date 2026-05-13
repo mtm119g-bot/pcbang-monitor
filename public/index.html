@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes">
+<title>PC방 멀티 모니터</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+:root{
+  --bg:#080c18;--bg2:#0f1623;--bg3:#161f2e;--bg4:#1c2840;
+  --ac:#00d4ff;--ac2:#00ff88;--warn:#ffaa00;--err:#ff4455;
+  --tx:#e2e8f0;--tx2:#94a3b8;--bd:#1e3a5f;
+  --fs:13px;--fs-sm:11px;--fs-xs:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--tx);font-family:'Noto Sans KR',sans-serif;min-height:100vh;font-size:var(--fs);}
+
+/* 헤더 */
+header{background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 14px;position:sticky;top:0;z-index:100;}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.logo{font-size:15px;font-weight:900;color:var(--ac);}
+.logo em{color:var(--tx2);font-style:normal;}
+.hdr-pills{display:flex;gap:6px;flex-wrap:wrap;}
+.pill{background:var(--bg3);border:1px solid var(--bd);border-radius:20px;padding:3px 9px;font-size:var(--fs-xs);}
+.pill b{font-weight:700;}
+.c-ac{color:var(--ac);}.c-ac2{color:var(--ac2);}.c-err{color:var(--err);}.c-warn{color:var(--warn);}
+
+/* 자동검색 바 */
+.auto-bar{background:var(--bg3);border-bottom:1px solid var(--bd);padding:8px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.auto-label{font-size:var(--fs-xs);color:var(--tx2);white-space:nowrap;}
+.auto-btns{display:flex;gap:5px;flex-wrap:wrap;}
+.auto-btn{padding:4px 10px;border-radius:20px;border:1px solid var(--bd);background:var(--bg2);color:var(--tx2);font-size:var(--fs-xs);font-family:'Noto Sans KR',sans-serif;font-weight:700;}
+.auto-btn.on{border-color:var(--ac2);color:var(--ac2);background:rgba(0,255,136,.1);}
+.auto-cd{font-family:monospace;font-size:var(--fs-xs);color:var(--ac);background:rgba(0,212,255,.1);border:1px solid var(--ac);border-radius:4px;padding:2px 7px;white-space:nowrap;}
+.prog{height:2px;background:var(--bg3);}
+.prog-f{height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2));width:0%;transition:width .2s;}
+.pulse{animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* 버튼 */
+.btn{padding:7px 12px;border-radius:8px;border:none;font-family:'Noto Sans KR',sans-serif;font-size:var(--fs-sm);font-weight:700;transition:all .15s;white-space:nowrap;touch-action:manipulation;}
+.btn:active{transform:scale(.95);}
+.bp{background:var(--ac);color:#000;}
+.bs{background:var(--err);color:#fff;}
+.bg{background:var(--bg3);color:var(--tx);border:1px solid var(--bd);}
+.be{background:var(--bg3);color:var(--ac2);border:1px solid var(--ac2);}
+.bsm{padding:5px 9px;font-size:var(--fs-xs);}
+input,select,textarea{background:var(--bg3);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-family:'Noto Sans KR',sans-serif;font-size:var(--fs-sm);padding:6px 10px;outline:none;transition:border .2s;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--ac);}
+lbl{font-size:var(--fs-xs);color:var(--tx2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px;}
+
+/* 글로벌 컨트롤 */
+.gctrl{background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 14px;}
+.gctrl-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;}
+.gctrl-row:last-child{margin-bottom:0;}
+.cg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:100px;}
+.badge{display:inline-block;background:rgba(0,212,255,.1);border:1px solid var(--ac);border-radius:4px;padding:2px 6px;font-size:var(--fs-xs);color:var(--ac);}
+.conc{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;width:100%;}
+.conc input{width:40px;background:transparent;border:none;color:var(--ac);font-weight:700;font-size:14px;text-align:center;padding:0;}
+
+/* 탭 */
+.tabs{display:flex;overflow-x:auto;border-bottom:2px solid var(--bd);background:var(--bg2);-webkit-overflow-scrolling:touch;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{padding:10px 14px;background:none;border:none;border-bottom:2px solid transparent;color:var(--tx2);font-family:'Noto Sans KR',sans-serif;font-size:var(--fs-sm);font-weight:700;margin-bottom:-2px;transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.tab.on{color:var(--ac);border-bottom-color:var(--ac);}
+
+/* 카드 */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;}
+.card-l{font-size:var(--fs-xs);color:var(--tx2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+.card-v{font-size:18px;font-weight:700;line-height:1;}
+
+/* 패널 모니터 */
+.sum-bar{background:var(--bg2);border-bottom:1px solid var(--bd);padding:7px 14px;display:flex;gap:10px;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.sum-i{display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.sum-dot{width:7px;height:7px;border-radius:50%;}
+.panels{display:flex;flex-direction:column;gap:10px;padding:10px 14px;}
+
+/* 세로모드: 패널 1열, 가로모드: 2열 */
+@media(orientation:landscape){
+  .panels{display:grid;grid-template-columns:repeat(2,1fr);}
+  .cards{grid-template-columns:repeat(4,1fr);}
+}
+
+.panel{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ph{padding:9px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd);}
+.ph-l{display:flex;align-items:center;gap:7px;}
+.pdot{width:9px;height:9px;border-radius:50%;}
+.pname{font-size:14px;font-weight:700;}
+.pstats{display:flex;gap:8px;align-items:center;}
+.pst{font-size:var(--fs-sm);}
+.pst b{font-size:14px;font-weight:700;}
+.pb{max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.pb table{width:100%;border-collapse:collapse;font-size:var(--fs-xs);}
+.pb th{padding:4px 8px;text-align:left;font-size:9px;color:var(--tx2);background:var(--bg3);text-transform:uppercase;position:sticky;top:0;}
+.pb td{padding:4px 8px;border-bottom:1px solid rgba(30,58,95,.3);}
+.pb tr:last-child td{border-bottom:none;}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:4px;}
+.don{background:var(--ac2);}.doff{background:var(--err);}.dwarn{background:var(--warn);}.dpend{background:var(--tx2);}
+.pbar{display:inline-block;height:3px;border-radius:2px;margin-right:3px;vertical-align:middle;}
+.pok{background:var(--ac2);}.pwarn{background:var(--warn);}.pbad{background:var(--err);}
+
+/* 업체 설정 */
+.biz-wrap{padding:12px 14px;}
+.biz-title{font-size:var(--fs-sm);color:var(--tx2);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.biz-list{display:flex;flex-direction:column;gap:8px;}
+.biz-row{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px;}
+.biz-row-top{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.biz-ci{width:32px;height:30px;border-radius:4px;border:1px solid var(--bd);padding:2px;flex-shrink:0;}
+.bdel{background:transparent;color:var(--err);border:1px solid var(--err);padding:4px 8px;font-size:var(--fs-xs);border-radius:4px;font-family:'Noto Sans KR',sans-serif;font-weight:700;flex-shrink:0;}
+.hint{font-size:9px;color:var(--tx2);margin-top:2px;}
+.hint b{color:var(--ac);}
+
+/* 통계/매출 */
+.spad{padding:12px 14px;}
+.sctrl{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px;}
+.sec{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px;}
+.sec-t{font-size:var(--fs-sm);font-weight:700;margin-bottom:10px;}
+.htabs{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;}
+.htab{padding:4px 10px;border-radius:20px;border:2px solid transparent;font-size:var(--fs-xs);font-weight:700;font-family:'Noto Sans KR',sans-serif;opacity:.45;}
+.htab.on{opacity:1;}
+.hmap-o{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
+.hmap-yl{display:flex;flex-direction:column;gap:2px;padding-top:18px;flex-shrink:0;}
+.hmap-ylb{font-size:9px;color:var(--tx2);height:14px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;white-space:nowrap;}
+.hmap-in{flex:1;min-width:0;}
+.hmap-xl{display:flex;gap:2px;margin-bottom:2px;}
+.hmap-xlb{font-size:8px;color:var(--tx2);width:14px;text-align:center;flex-shrink:0;}
+.hmap-rows{display:flex;flex-direction:column;gap:2px;}
+.hmap-row{display:flex;gap:2px;}
+.hcell{width:14px;height:14px;border-radius:2px;flex-shrink:0;}
+.legend{display:flex;align-items:center;gap:3px;margin-bottom:10px;flex-wrap:wrap;}
+.lc{display:inline-block;width:12px;height:12px;border-radius:2px;}
+.ll{font-size:9px;color:var(--tx2);margin:0 2px;}
+.cw{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+canvas{display:block;}
+
+/* 매출 */
+.price-card{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:8px;}
+.stbl{width:100%;border-collapse:collapse;font-size:var(--fs-xs);}
+.stbl th{padding:6px 8px;text-align:left;font-size:9px;color:var(--tx2);text-transform:uppercase;background:var(--bg3);white-space:nowrap;}
+.stbl td{padding:6px 8px;border-bottom:1px solid rgba(30,58,95,.3);font-size:var(--fs-xs);white-space:nowrap;}
+.stbl tr:last-child td{border-bottom:none;}
+.stbl-sum td{background:var(--bg3);font-weight:700;border-top:1px solid var(--bd);}
+
+/* 툴팁 */
+.tip{position:fixed;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:5px 9px;font-size:var(--fs-xs);color:var(--tx);pointer-events:none;z-index:9999;display:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.6);}
+
+/* 모달 */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:flex-end;justify-content:center;}
+.ov.on{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--bd);border-radius:16px 16px 0 0;padding:20px 16px;width:100%;max-width:600px;max-height:85vh;overflow-y:auto;}
+.modal h3{font-size:15px;margin-bottom:12px;color:var(--ac);}
+
+.empty{text-align:center;padding:36px 16px;color:var(--tx2);}
+.empty .ei{font-size:30px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="tip" id="tip"></div>
+
+<header>
+  <div class="hdr-top">
+    <div class="logo">PC<em>방</em> MONITOR</div>
+    <div class="hdr-pills">
+      <div class="pill">온 <b class="c-ac2" id="hd-on">0</b>/<b id="hd-tot" style="color:var(--tx2)">0</b></div>
+      <div class="pill" id="hd-st">대기중</div>
+    </div>
+  </div>
+  <div class="hdr-pills">
+    <div class="pill" id="hd-cd" style="display:none">다음스캔 <b class="c-ac" id="cd-v">-</b></div>
+    <div class="pill" id="iv-badge" style="display:none"></div>
+  </div>
+</header>
+<div class="prog"><div class="prog-f" id="prog"></div></div>
+
+<!-- 자동검색 바 -->
+<div class="auto-bar">
+  <span class="auto-label">자동검색</span>
+  <div class="auto-btns">
+    <button class="auto-btn" data-auto="off">OFF</button>
+    <button class="auto-btn" data-auto="1800000">30분</button>
+    <button class="auto-btn" data-auto="3600000">1시간</button>
+    <button class="auto-btn" data-auto="7200000">2시간</button>
+  </div>
+  <span class="auto-cd" id="auto-cd" style="display:none">-</span>
+</div>
+
+<!-- 글로벌 컨트롤 -->
+<div class="gctrl">
+  <div class="gctrl-row">
+    <div class="cg">
+      <lbl>핑 간격</lbl>
+      <select id="iv">
+        <option value="5000">5초</option>
+        <option value="10000" selected>10초</option>
+        <option value="30000">30초</option>
+        <option value="60000">1분</option>
+        <option value="300000">5분</option>
+        <option value="600000">10분</option>
+      </select>
+    </div>
+    <div class="cg">
+      <lbl>타임아웃</lbl>
+      <select id="to">
+        <option value="2000">2초</option>
+        <option value="3000" selected>3초</option>
+        <option value="5000">5초</option>
+      </select>
+    </div>
+    <div class="cg">
+      <lbl>동시 핑</lbl>
+      <div class="conc">
+        <span style="color:var(--tx2);font-size:10px">동시</span>
+        <input type="number" id="cc" value="10" min="1" max="50">
+        <span style="color:var(--tx2);font-size:10px">개</span>
+      </div>
+    </div>
+  </div>
+  <div class="gctrl-row">
+    <button class="btn bp" id="btn-start" style="flex:1">▶ 시작</button>
+    <button class="btn bs" id="btn-stop" style="display:none;flex:1">■ 정지</button>
+    <button class="btn be bsm" id="btn-csv">📥 CSV</button>
+    <button class="btn bg bsm" id="btn-sample">샘플</button>
+  </div>
+</div>
+
+<!-- 탭 -->
+<div class="tabs">
+  <button class="tab on" data-tab="monitor">📡 모니터</button>
+  <button class="tab" data-tab="stats">📊 통계</button>
+  <button class="tab" data-tab="sales">💰 매출</button>
+  <button class="tab" data-tab="settings">⚙️ 설정</button>
+</div>
+
+<!-- 실시간 모니터 -->
+<div id="tab-monitor">
+  <div class="sum-bar" id="sum-bar"></div>
+  <div class="panels" id="panels">
+    <div class="empty"><div class="ei">📡</div><p>설정 탭에서 업체를 추가하고 시작 버튼을 누르세요</p></div>
+  </div>
+</div>
+
+<!-- 통계 -->
+<div id="tab-stats" style="display:none">
+  <div class="spad">
+    <div class="sctrl">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="cg" style="min-width:140px"><lbl>조회 월</lbl><input type="month" id="st-month"></div>
+        <button class="btn bp bsm" id="st-calc">📊 조회</button>
+        <button class="btn be bsm" id="st-csv">📥 CSV</button>
+        <button class="btn bg bsm" id="st-del" style="color:var(--err);border-color:var(--err)">🗑</button>
+      </div>
+    </div>
+    <div class="cards" id="st-cards" style="display:none"></div>
+    <div class="sec" id="st-compare" style="display:none">
+      <div class="sec-t">🏢 업체별 비교</div>
+      <div id="st-biz-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+    <div class="sec" id="st-hmap" style="display:none">
+      <div class="sec-t">🔥 시간대별 히트맵</div>
+      <div class="htabs" id="hmap-tabs"></div>
+      <div class="legend">
+        <span class="ll">적음</span>
+        <span class="lc" style="background:#0d1525"></span><span class="lc" style="background:#0d2a4a"></span>
+        <span class="lc" style="background:#0066aa"></span><span class="lc" style="background:#00aaff"></span>
+        <span class="lc" style="background:#00d4ff"></span><span class="lc" style="background:#00ff88"></span>
+        <span class="ll">많음</span>
+      </div>
+      <div class="hmap-o"><div class="hmap-yl" id="hmap-y"></div>
+        <div class="hmap-in"><div class="hmap-xl" id="hmap-x"></div><div class="hmap-rows" id="hmap-g"></div></div>
+      </div>
+    </div>
+    <div class="sec" id="st-line" style="display:none">
+      <div class="sec-t">📈 시간대별 평균</div>
+      <div class="htabs" id="line-tabs"></div>
+      <div class="cw"><canvas id="line-c"></canvas></div>
+    </div>
+    <div class="empty" id="st-empty"><div class="ei">📊</div><p>조회 월을 선택하고 조회 버튼을 누르세요</p></div>
+  </div>
+</div>
+
+<!-- 매출 -->
+<div id="tab-sales" style="display:none">
+  <div class="spad">
+    <div class="sec">
+      <div class="sec-t">⚙️ 요금 설정</div>
+      <div id="sales-settings"></div>
+    </div>
+    <div class="sctrl">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="cg" style="min-width:140px"><lbl>조회 월</lbl><input type="month" id="sa-month"></div>
+        <div class="cg" style="min-width:120px"><lbl>요금 단위</lbl>
+          <select id="sa-unit"><option value="1">시간당</option><option value="0.5">30분당</option></select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn bp" id="sa-calc" style="flex:1">📊 매출 계산</button>
+        <button class="btn be bsm" id="sa-csv">📥 CSV</button>
+      </div>
+    </div>
+    <div class="cards" id="sa-cards" style="display:none"></div>
+    <div class="sec" id="sa-chart-sec" style="display:none">
+      <div class="sec-t">📈 일별 예상 매출</div>
+      <div class="htabs" id="sa-chart-tabs"></div>
+      <div class="cw"><canvas id="sa-bar"></canvas></div>
+    </div>
+    <div class="sec" id="sa-tbl-sec" style="display:none">
+      <div class="sec-t">📋 일별 상세</div>
+      <div class="htabs" id="sa-biz-tabs"></div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table class="stbl"><thead id="sa-thead"></thead><tbody id="sa-tbody"></tbody></table>
+      </div>
+    </div>
+    <div class="empty" id="sa-empty"><div class="ei">💰</div><p>요금을 설정하고 계산 버튼을 누르세요</p></div>
+  </div>
+</div>
+
+<!-- 업체 설정 -->
+<div id="tab-settings" style="display:none">
+  <div class="biz-wrap">
+    <div class="biz-title">🏢 업체 목록 &nbsp;<b class="c-ac" id="biz-cnt">0개</b>
+      <button class="btn bg bsm" id="btn-add-biz">+ 업체 추가</button>
+      <button class="btn bg bsm" id="btn-open-sample">샘플 IP</button>
+    </div>
+    <div class="biz-list" id="biz-list"></div>
+  </div>
+</div>
+
+<!-- 샘플 모달 -->
+<div class="ov" id="modal-sample">
+  <div class="modal">
+    <h3>📋 샘플 IP</h3>
+    <div style="margin-bottom:10px;"><lbl>적용할 업체</lbl><select id="sample-biz"></select></div>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px;">
+      <button class="btn bg" data-prefix="192.168.1">192.168.1.1 ~ 200</button>
+      <button class="btn bg" data-prefix="192.168.0">192.168.0.1 ~ 200</button>
+      <button class="btn bg" data-prefix="10.0.0">10.0.0.1 ~ 200</button>
+    </div>
+    <div style="margin-bottom:10px;"><lbl>직접 입력</lbl>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="cr-p" placeholder="192.168.1" style="flex:1;min-width:120px;">
+        <input type="number" id="cr-s" value="1" min="1" max="254" style="width:55px;">
+        <span style="color:var(--tx2)">~</span>
+        <input type="number" id="cr-e" value="200" min="1" max="254" style="width:55px;">
+        <button class="btn bp bsm" id="cr-apply">적용</button>
+      </div>
+    </div>
+    <button class="btn bg" id="modal-close" style="width:100%">닫기</button>
+  </div>
+</div>
+
+<script>
+var G={
+  bizList:[],hosts:[],running:false,ivId:null,cdId:null,nextScan:null,
+  bizSeq:0,COLORS:['#00d4ff','#00ff88','#ffaa00','#ff4455','#cc44ff','#ff8844','#44ffcc','#ff44cc','#88ff44','#4488ff'],
+  hmapBizId:'all',lineSelIds:[],salesSelId:'all',salesData:null,salesDays:null,
+  autoIvId:null,autoCdId:null,autoNextScan:null,autoInterval:0
+};
+
+function pad(n){return String(n).padStart(2,'0');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function won(n){if(n<0)return '-'+won(-n);if(n>=100000000)return (n/100000000).toFixed(1)+'억원';if(n>=10000)return Math.round(n/10000)+'만원';return n.toLocaleString()+'원';}
+function wonFull(n){return n.toLocaleString()+'원';}
+function monthStr(){var now=new Date();return now.getFullYear()+'-'+pad(now.getMonth()+1);}
+function fmtTime(ms){
+  if(ms<=0)return '스캔중...';
+  var h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
+  if(h>0)return h+'시간 '+pad(m)+'분 '+pad(s)+'초';
+  if(m>0)return m+'분 '+pad(s)+'초';
+  return s+'초';
+}
+
+// ── 자동검색 ──────────────────────────────────────
+document.querySelectorAll('.auto-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.auto-btn').forEach(function(b){b.classList.remove('on');});
+    btn.classList.add('on');
+    var val=btn.dataset.auto;
+    stopAutoScan();
+    setServerAutoScan(val==='off'?0:parseInt(val));
+    if(val!=='off'){
+      G.autoInterval=parseInt(val);
+      startAutoScan(G.autoInterval);
+    } else {
+      document.getElementById('auto-cd').style.display='none';
+    }
+  });
+});
+
+function startAutoScan(iv){
+  G.autoNextScan=Date.now()+iv;
+  var cdEl=document.getElementById('auto-cd');
+  cdEl.style.display='';
+  clearInterval(G.autoCdId);
+  G.autoCdId=setInterval(function(){
+    var rem=G.autoNextScan-Date.now();
+    cdEl.textContent=fmtTime(rem);
+    if(rem<=0){
+      G.autoNextScan=Date.now()+iv;
+      if(G.hosts.length>0) runScan();
+      else if(G.bizList.length>0){
+        buildHosts();
+        if(G.hosts.length>0) runScan();
+      }
+    }
+  },1000);
+  G.autoIvId=setTimeout(function(){
+    clearInterval(G.autoCdId);
+    G.autoCdId=setInterval(function(){
+      var rem=G.autoNextScan-Date.now();
+      cdEl.textContent=fmtTime(rem);
+      if(rem<=0){
+        G.autoNextScan=Date.now()+iv;
+        if(G.hosts.length>0) runScan();
+      }
+    },1000);
+  },iv);
+}
+
+function stopAutoScan(){
+  clearInterval(G.autoCdId);clearTimeout(G.autoIvId);
+  G.autoCdId=null;G.autoIvId=null;G.autoInterval=0;
+}
+
+// ── IP 파싱 ────────────────────────────────────────
+function expandIP(line){
+  line=line.trim();
+  var m=line.match(/^(\d+\.\d+\.\d+\.)(\d+)\s*~\s*(\d+)$/);
+  if(m){var res=[],s=parseInt(m[2]),e=parseInt(m[3]);if(s<=e&&e<=255)for(var i=s;i<=e;i++)res.push(m[1]+i);return res;}
+  if(/^\d+\.\d+\.\d+\.\d+$/.test(line))return [line];
+  return [];
+}
+function bizIPs(b){
+  var ips=[];
+  b.ipRange.split(/[,\n]/).forEach(function(p){expandIP(p.trim()).forEach(function(ip){ips.push(ip);});});
+  return ips;
+}
+
+// ── 업체 관리 ──────────────────────────────────────
+function addBiz(name,color,ipRange){
+  G.bizSeq++;
+  var b={id:G.bizSeq,name:name||('업체'+G.bizSeq),color:color||G.COLORS[(G.bizSeq-1)%G.COLORS.length],ipRange:ipRange||''};
+  G.bizList.push(b);renderBizList();return b;
+}
+function removeBiz(id){
+  if(G.bizList.length<=1){alert('최소 1개 업체가 필요합니다.');return;}
+  G.bizList=G.bizList.filter(function(b){return b.id!==id;});renderBizList();
+}
+function renderBizList(){
+  var el=document.getElementById('biz-list');
+  el.innerHTML=G.bizList.map(function(b,i){
+    return '<div class="biz-row">'
+      +'<div class="biz-row-top">'
+      +'<span style="color:var(--tx2);font-size:11px;min-width:18px">'+(i+1)+'.</span>'
+      +'<input type="color" class="biz-ci" value="'+b.color+'" data-id="'+b.id+'" data-f="color">'
+      +'<input type="text" value="'+esc(b.name)+'" placeholder="업체명" data-id="'+b.id+'" data-f="name" style="flex:1">'
+      +'<button class="bdel" data-del="'+b.id+'">✕</button>'
+      +'</div>'
+      +'<div><lbl>IP 범위 (쉼표 또는 줄바꿈)</lbl>'
+      +'<input type="text" value="'+esc(b.ipRange)+'" placeholder="192.168.1.1~200" data-id="'+b.id+'" data-f="ipRange">'
+      +'<div class="hint">예: <b>192.168.1.1~100</b> 또는 <b>10.0.0.1~50, 10.0.1.1~50</b></div>'
+      +'</div></div>';
+  }).join('');
+  document.getElementById('biz-cnt').textContent=G.bizList.length+'개';
+  renderSalesSettings();
+}
+document.getElementById('biz-list').addEventListener('change',function(e){
+  var t=e.target,id=parseInt(t.dataset.id),f=t.dataset.f;
+  if(!id||!f)return;
+  var b=G.bizList.find(function(x){return x.id===id;});
+  if(b){b[f]=t.value;if(f==='name'||f==='color')renderBizList();}
+});
+document.getElementById('biz-list').addEventListener('click',function(e){
+  var t=e.target.closest('[data-del]');
+  if(t)removeBiz(parseInt(t.dataset.del));
+});
+
+// ── 핑 체크 ────────────────────────────────────────
+function checkHost(host){
+  var timeout=parseInt(document.getElementById('to').value);
+  var start=performance.now();host.attempts++;
+  var ctrl=new AbortController();
+  var timer=setTimeout(function(){ctrl.abort();},timeout);
+  return fetch('http://'+host.ip,{mode:'no-cors',signal:ctrl.signal,cache:'no-store'})
+    .then(function(){clearTimeout(timer);var ms=Math.round(performance.now()-start);host.ping=ms;host.status=ms>100?'warn':'online';host.successes++;})
+    .catch(function(e){clearTimeout(timer);var ms=Math.round(performance.now()-start);
+      if(e.name==='AbortError'){host.ping=null;host.status='offline';}
+      else{if(ms<timeout-100){host.ping=ms;host.status=ms>100?'warn':'online';host.successes++;}else{host.ping=null;host.status='offline';}}
+    })
+    .then(function(){host.lastCheck=new Date();host.history.push(host.ping);if(host.history.length>20)host.history.shift();});
+}
+
+function buildHosts(){
+  G.hosts=[];var idx=1;
+  G.bizList.forEach(function(b){
+    bizIPs(b).forEach(function(ip){
+      G.hosts.push({idx:idx++,ip:ip,bizId:b.id,bizName:b.name,bizColor:b.color,
+        status:'pending',ping:null,lastCheck:null,history:[],attempts:0,successes:0});
+    });
+  });
+}
+
+function runScan(){
+  var total=G.hosts.length;if(!total)return Promise.resolve();
+  var cc=Math.max(1,Math.min(50,parseInt(document.getElementById('cc').value)||10));
+  var done=0,idx=0;
+  function next(){
+    if(!G.running||idx>=total)return Promise.resolve();
+    var batch=[];while(idx<total&&batch.length<cc)batch.push(G.hosts[idx++]);
+    return Promise.all(batch.map(checkHost)).then(function(){
+      done+=batch.length;
+      document.getElementById('prog').style.width=(done/total*100)+'%';
+      renderMonitor();return next();
+    });
+  }
+  return next().then(function(){document.getElementById('prog').style.width='0%';saveStats();});
+}
+
+// ── 시작/정지 ─────────────────────────────────────
+document.getElementById('btn-start').addEventListener('click',function(){saveBizToServer();requestServerScan();
+  buildHosts();
+  if(!G.hosts.length){alert('설정 탭에서 IP를 입력해주세요!');return;}
+  G.running=true;
+  document.getElementById('btn-start').style.display='none';
+  document.getElementById('btn-stop').style.display='';
+  document.getElementById('hd-st').innerHTML='<span class="pulse" style="color:var(--ac2)">● 스캔중</span>';
+  var iv=parseInt(document.getElementById('iv').value);
+  var lbl=document.getElementById('iv').options[document.getElementById('iv').selectedIndex].text;
+  var badge=document.getElementById('iv-badge');
+  badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
+  runScan().then(function(){startCD(iv);});
+  G.ivId=setInterval(function(){G.nextScan=Date.now()+iv;runScan();},iv);
+  startCD(iv);
+});
+document.getElementById('btn-stop').addEventListener('click',function(){
+  G.running=false;clearInterval(G.ivId);G.ivId=null;clearInterval(G.cdId);G.cdId=null;
+  document.getElementById('btn-start').style.display='';document.getElementById('btn-stop').style.display='none';
+  document.getElementById('hd-st').textContent='정지됨';
+  document.getElementById('iv-badge').style.display='none';
+  document.getElementById('hd-cd').style.display='none';
+});
+function startCD(iv){
+  G.nextScan=Date.now()+iv;document.getElementById('hd-cd').style.display='';
+  clearInterval(G.cdId);
+  G.cdId=setInterval(function(){
+    var rem=G.nextScan-Date.now();
+    document.getElementById('cd-v').textContent=fmtTime(rem);
+    if(rem<=0)G.nextScan=Date.now()+iv;
+  },1000);
+}
+
+// ── 모니터 렌더링 ──────────────────────────────────
+function renderMonitor(){
+  var on=G.hosts.filter(function(h){return h.status==='online'||h.status==='warn';}).length;
+  document.getElementById('hd-on').textContent=on;
+  document.getElementById('hd-tot').textContent=G.hosts.length;
+  var bar=document.getElementById('sum-bar');
+  bar.innerHTML=G.bizList.map(function(b){
+    var bh=G.hosts.filter(function(h){return h.bizId===b.id;});
+    var bon=bh.filter(function(h){return h.status==='online'||h.status==='warn';}).length;
+    return '<div class="sum-i"><div class="sum-dot" style="background:'+b.color+'"></div>'
+      +'<span style="font-size:11px;color:var(--tx2)">'+esc(b.name)+'</span>'
+      +'<span style="font-size:12px"><b class="c-ac2">'+bon+'</b><span style="color:var(--bd)">/</span><span style="color:var(--tx2)">'+bh.length+'</span></span></div>';
+  }).join('<span style="color:var(--bd);margin:0 3px">│</span>');
+
+  var panels=document.getElementById('panels');
+  if(!G.bizList.length){panels.innerHTML='<div class="empty"><div class="ei">🏢</div><p>설정 탭에서 업체를 추가해주세요</p></div>';return;}
+  panels.innerHTML=G.bizList.map(function(b){
+    var bh=G.hosts.filter(function(h){return h.bizId===b.id;});
+    var bon=bh.filter(function(h){return h.status==='online'||h.status==='warn';}).length;
+    var boff=bh.filter(function(h){return h.status==='offline';}).length;
+    var pings=bh.filter(function(h){return h.ping!==null;}).map(function(h){return h.ping;});
+    var avg=pings.length?Math.round(pings.reduce(function(a,c){return a+c;},0)/pings.length):0;
+    var rate=bh.length?Math.round(bon/bh.length*100):0;
+    var rc=rate>=80?'var(--ac2)':rate>=50?'var(--warn)':'var(--err)';
+    var rows=bh.map(function(h){
+      var dc=h.status==='online'?'don':h.status==='warn'?'dwarn':h.status==='offline'?'doff':'dpend';
+      var st=h.status==='online'?'온라인':h.status==='warn'?'느림':h.status==='offline'?'오프':'-';
+      var pc=h.ping===null?'':h.ping<=50?'pok':h.ping<=100?'pwarn':'pbad';
+      var bw=h.ping?Math.min(h.ping/3,50):0;
+      var pt=h.ping!==null?h.ping+'ms':'-';
+      var pc2=h.ping===null?'var(--tx2)':h.ping<=50?'var(--ac2)':h.ping<=100?'var(--warn)':'var(--err)';
+      return '<tr><td style="color:var(--tx2)">'+h.idx+'</td>'
+        +'<td style="color:var(--ac)">'+h.ip+'</td>'
+        +'<td><span class="dot '+dc+'"></span>'+st+'</td>'
+        +'<td>'+(h.ping!==null?'<span class="pbar '+pc+'" style="width:'+bw+'px"></span>':'')+'<span style="color:'+pc2+'">'+pt+'</span></td></tr>';
+    }).join('');
+    return '<div class="panel">'
+      +'<div class="ph"><div class="ph-l"><div class="pdot" style="background:'+b.color+';box-shadow:0 0 5px '+b.color+'"></div><span class="pname">'+esc(b.name)+'</span></div>'
+      +'<div class="pstats"><div class="pst"><b class="c-ac2">'+bon+'</b>온</div><div class="pst"><b class="c-err">'+boff+'</b>오프</div>'
+      +(avg?'<div class="pst"><b class="c-warn">'+avg+'</b>ms</div>':'')
+      +'<div style="font-size:14px;font-weight:700;color:'+rc+'">'+rate+'%</div></div></div>'
+      +'<div style="height:3px;background:var(--bg4)"><div style="height:100%;width:'+rate+'%;background:'+rc+';transition:width .4s"></div></div>'
+      +'<div class="pb">'+(bh.length?'<table><thead><tr><th>#</th><th>IP</th><th>상태</th><th>응답</th></tr></thead><tbody>'+rows+'</tbody></table>'
+        :'<div class="empty" style="padding:16px"><div class="ei" style="font-size:20px">📭</div><p style="font-size:10px">IP 없음</p></div>')+'</div></div>';
+  }).join('');
+}
+
+// ── CSV ────────────────────────────────────────────
+document.getElementById('btn-csv').addEventListener('click',function(){
+  if(!G.hosts.length){alert('데이터 없음');return;}
+  var rows=[['번호','업체','IP','상태','핑(ms)','성공률','마지막확인']];
+  G.hosts.forEach(function(h){rows.push([h.idx,h.bizName,h.ip,h.status,h.ping!=null?h.ping:'',h.attempts>0?Math.round(h.successes/h.attempts*100)+'%':'',h.lastCheck?h.lastCheck.toLocaleString('ko-KR'):'']);});
+  dlCSV(rows,'ping_'+new Date().toISOString().slice(0,10)+'.csv');
+});
+function dlCSV(rows,fname){
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();
+}
+
+// ── 탭 전환 ────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
+    btn.classList.add('on');
+    var tab=btn.dataset.tab;
+    ['monitor','stats','sales','settings'].forEach(function(t){
+      document.getElementById('tab-'+t).style.display=t===tab?'':'none';
+    });
+    if(tab==='sales')initSalesTab();
+    if(tab==='settings')renderBizList();
+  });
+});
+
+// ── 통계 저장 ──────────────────────────────────────
+function saveStats(){
+  var now=new Date(),dk=now.toISOString().slice(0,10),hr=now.getHours();
+  var mk='ps_'+dk.slice(0,7);
+  var d={};try{d=JSON.parse(localStorage.getItem(mk)||'{}');}catch(e){}
+  if(!d[dk])d[dk]={};if(!d[dk][hr])d[dk][hr]={on:0,tot:0,n:0};
+  var sl=d[dk][hr];
+  sl.on+=G.hosts.filter(function(h){return h.status==='online'||h.status==='warn';}).length;
+  sl.tot+=G.hosts.filter(function(h){return h.status!=='pending';}).length;sl.n++;
+  try{localStorage.setItem(mk,JSON.stringify(d));}catch(e){}
+  G.bizList.forEach(function(b){
+    var bmk='psb_'+b.id+'_'+dk.slice(0,7);
+    var bd={};try{bd=JSON.parse(localStorage.getItem(bmk)||'{}');}catch(e){}
+    if(!bd[dk])bd[dk]={};if(!bd[dk][hr])bd[dk][hr]={on:0,tot:0,n:0};
+    var bsl=bd[dk][hr];
+    var bh=G.hosts.filter(function(h){return h.bizId===b.id;});
+    bsl.on+=bh.filter(function(h){return h.status==='online'||h.status==='warn';}).length;
+    bsl.tot+=bh.filter(function(h){return h.status!=='pending';}).length;bsl.n++;
+    try{localStorage.setItem(bmk,JSON.stringify(bd));}catch(e){}
+  });
+}
+
+// ── 통계 ───────────────────────────────────────────
+function getMonthDays(month){var ym=month.split('-').map(Number);var dim=new Date(ym[0],ym[1],0).getDate();var days=[];for(var d=1;d<=dim;d++)days.push(month+'-'+pad(d));return days;}
+function getHours(){var h=[];for(var i=0;i<24;i++)h.push(i);return h;}
+function hColor(val,max){if(!val||val===0)return '#0d1525';if(max===0)return '#0d1525';var r=val/max;var stops=['#0d2a4a','#0a4070','#0066aa','#00aaff','#00d4ff','#00ff88'];return stops[Math.min(Math.floor(r*stops.length),stops.length-1)];}
+
+document.getElementById('st-calc').addEventListener('click',function(){
+  var month=document.getElementById('st-month').value;
+  if(!month){alert('조회 월을 선택해주세요');return;}
+  var days=getMonthDays(month),hours=getHours();
+  var d={};try{d=JSON.parse(localStorage.getItem('ps_'+month)||'{}');}catch(e){}
+  var bizData={};
+  G.bizList.forEach(function(b){var bd={};try{bd=JSON.parse(localStorage.getItem('psb_'+b.id+'_'+month)||'{}');}catch(e){}bizData[b.id]=bd;});
+  var hasData=Object.keys(d).length>0||G.bizList.some(function(b){return Object.keys(bizData[b.id]).length>0;});
+  document.getElementById('st-empty').style.display=hasData?'none':'';
+  ['st-cards','st-compare','st-hmap','st-line'].forEach(function(id){document.getElementById(id).style.display=hasData?'':'none';});
+  if(!hasData)return;
+  var ts=0,tn=0,gMax=0,pkH=0,pkD='-';
+  days.forEach(function(day){if(!d[day])return;hours.forEach(function(h){var s=d[day][h];if(!s||!s.n)return;var avg=s.on/s.n;ts+=avg;tn++;if(avg>gMax){gMax=avg;pkH=h;pkD=day.slice(5);}});});
+  var gavg=tn>0?(ts/tn).toFixed(1):0;
+  document.getElementById('st-cards').innerHTML=
+    '<div class="card"><div class="card-l">데이터 일수</div><div class="card-v c-ac">'+Object.keys(d).length+'일</div></div>'+
+    '<div class="card"><div class="card-l">평균 온라인</div><div class="card-v c-warn">'+gavg+'명</div></div>'+
+    '<div class="card"><div class="card-l">최대 온라인</div><div class="card-v c-ac2">'+gMax.toFixed(1)+'명</div></div>'+
+    '<div class="card"><div class="card-l">피크 시간</div><div class="card-v c-ac" style="font-size:16px">'+pkD+' '+pkH+'시</div></div>';
+  var compHtml='';
+  G.bizList.forEach(function(b){
+    var bd=bizData[b.id]||{};var bs=0,bn=0,bMax=0,bPkH=0,bPkD='-';
+    days.forEach(function(day){if(!bd[day])return;hours.forEach(function(h){var s=bd[day][h];if(!s||!s.n)return;var avg=s.on/s.n;bs+=avg;bn++;if(avg>bMax){bMax=avg;bPkH=h;bPkD=day.slice(5);}});});
+    var bavg=bn>0?(bs/bn).toFixed(1):0;
+    compHtml+='<div style="background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px;">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:'+b.color+'"></div><span style="font-size:13px;font-weight:700">'+esc(b.name)+'</span></div>'
+      +'<div style="font-size:20px;font-weight:700;color:'+b.color+'">'+bavg+'<span style="font-size:12px;color:var(--tx2)"> 평균</span></div>'
+      +'<div style="height:4px;background:var(--bg4);border-radius:2px;margin:5px 0"><div style="height:100%;width:'+Math.min(100,parseFloat(bavg)/Math.max(parseFloat(gavg),1)*100)+'%;background:'+b.color+';border-radius:2px"></div></div>'
+      +'<div style="font-size:10px;color:var(--tx2)">최대 '+bMax.toFixed(1)+'명 · 피크 '+bPkD+' '+bPkH+'시</div></div>';
+  });
+  document.getElementById('st-biz-grid').innerHTML=compHtml||'<div style="color:var(--tx2);font-size:12px">데이터 없음</div>';
+  var hmapTabEl=document.getElementById('hmap-tabs');hmapTabEl.innerHTML='';
+  var allBtn=document.createElement('button');allBtn.className='htab on';allBtn.textContent='전체';
+  allBtn.style.cssText='background:rgba(0,212,255,.1);border-color:var(--ac);color:var(--ac)';
+  allBtn.addEventListener('click',function(){G.hmapBizId='all';hmapTabEl.querySelectorAll('.htab').forEach(function(b){b.classList.remove('on');});allBtn.classList.add('on');drawHeatmap(days,hours,'all',d,bizData);});
+  hmapTabEl.appendChild(allBtn);
+  G.bizList.forEach(function(b){
+    var btn=document.createElement('button');btn.className='htab';btn.textContent=b.name;
+    btn.style.cssText='background:'+b.color+'22;border-color:'+b.color+';color:'+b.color;
+    btn.addEventListener('click',function(){G.hmapBizId=b.id;hmapTabEl.querySelectorAll('.htab').forEach(function(x){x.classList.remove('on');});btn.classList.add('on');drawHeatmap(days,hours,b.id,d,bizData);});
+    hmapTabEl.appendChild(btn);
+  });
+  drawHeatmap(days,hours,'all',d,bizData);
+  G.lineSelIds=G.bizList.map(function(b){return b.id;});
+  var lineTabEl=document.getElementById('line-tabs');lineTabEl.innerHTML='';
+  var allLBtn=document.createElement('button');allLBtn.className='htab on';allLBtn.textContent='전체';
+  allLBtn.style.cssText='background:rgba(0,212,255,.1);border-color:var(--ac);color:var(--ac)';
+  allLBtn.addEventListener('click',function(){G.lineSelIds=G.bizList.map(function(b){return b.id;});lineTabEl.querySelectorAll('.htab').forEach(function(b){b.classList.add('on');});drawLineChart(days,hours,d,bizData);});
+  lineTabEl.appendChild(allLBtn);
+  G.bizList.forEach(function(b){
+    var btn=document.createElement('button');btn.className='htab on';btn.textContent=b.name;
+    btn.style.cssText='background:'+b.color+'22;border-color:'+b.color+';color:'+b.color;
+    btn.addEventListener('click',function(){var i=G.lineSelIds.indexOf(b.id);if(i>=0)G.lineSelIds.splice(i,1);else G.lineSelIds.push(b.id);btn.classList.toggle('on');drawLineChart(days,hours,d,bizData);});
+    lineTabEl.appendChild(btn);
+  });
+  drawLineChart(days,hours,d,bizData);
+});
+
+function drawHeatmap(days,hours,bizId,d,bizData){
+  var src=bizId==='all'?d:(bizData[bizId]||{});
+  var gMax=0;var matrix={};
+  hours.forEach(function(h){matrix[h]={};days.forEach(function(day){var s=src[day]&&src[day][h];var v=(s&&s.n>0)?s.on/s.n:null;matrix[h][day]=v;if(v&&v>gMax)gMax=v;});});
+  document.getElementById('hmap-x').innerHTML=days.map(function(d){return '<div class="hmap-xlb">'+parseInt(d.slice(8))+'</div>';}).join('');
+  document.getElementById('hmap-y').innerHTML=hours.map(function(h){return '<div class="hmap-ylb">'+h+'시</div>';}).join('');
+  var tip=document.getElementById('tip');
+  document.getElementById('hmap-g').innerHTML=hours.map(function(h){
+    return '<div class="hmap-row">'+days.map(function(day){
+      var v=matrix[h][day],color=hColor(v,gMax);
+      var lbl=day.slice(5)+' '+h+'시: '+(v!==null?v.toFixed(1)+'명':'없음');
+      return '<div class="hcell" style="background:'+color+'" data-tip="'+esc(lbl)+'"></div>';
+    }).join('')+'</div>';
+  }).join('');
+  document.getElementById('hmap-g').querySelectorAll('.hcell').forEach(function(cell){
+    cell.addEventListener('click',function(){tip.style.display='block';tip.textContent=cell.dataset.tip;tip.style.left='50%';tip.style.top='50%';tip.style.transform='translate(-50%,-50%)';setTimeout(function(){tip.style.display='none';},2000);});
+  });
+}
+
+function drawLineChart(days,hours,d,bizData){
+  var canvas=document.getElementById('line-c');
+  var W=canvas.parentElement.clientWidth||320,H=140,dpr=window.devicePixelRatio||1;
+  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  var ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  var pL=38,pR=10,pT=18,pB=24,cW=W-pL-pR,cH=H-pT-pB;
+  var series=[];
+  var allAvg=hours.map(function(h){var s=0,n=0;days.forEach(function(day){var sl=d[day]&&d[day][h];if(sl&&sl.n>0){s+=sl.on/sl.n;n++;}});return n>0?s/n:0;});
+  series.push({name:'전체',color:'#ffffff',vals:allAvg,dash:true});
+  G.bizList.forEach(function(b){
+    if(G.lineSelIds.indexOf(b.id)<0)return;
+    var bd=bizData[b.id]||{};
+    var bAvg=hours.map(function(h){var s=0,n=0;days.forEach(function(day){var sl=bd[day]&&bd[day][h];if(sl&&sl.n>0){s+=sl.on/sl.n;n++;}});return n>0?s/n:0;});
+    series.push({name:b.name,color:b.color,vals:bAvg,dash:false});
+  });
+  var maxV=1;series.forEach(function(s){s.vals.forEach(function(v){if(v>maxV)maxV=v;});});
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#1e3a5f';ctx.lineWidth=1;
+  [0,.5,1].forEach(function(r){var y=pT+cH*(1-r);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(pL+cW,y);ctx.stroke();ctx.fillStyle='#94a3b8';ctx.font='9px monospace';ctx.textAlign='right';ctx.fillText(Math.round(maxV*r),pL-3,y+3);});
+  ctx.fillStyle='#94a3b8';ctx.font='9px monospace';ctx.textAlign='center';
+  hours.forEach(function(h,i){if(h%6===0){var x=pL+(i/(hours.length-1))*cW;ctx.fillText(h+'시',x,H-6);}});
+  var lx=pL;
+  series.forEach(function(s){ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.dash?1:1.5;ctx.setLineDash(s.dash?[3,3]:[]);ctx.moveTo(lx,12);ctx.lineTo(lx+12,12);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=s.color;ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(s.name,lx+15,14);lx+=ctx.measureText(s.name).width+30;});
+  series.forEach(function(s){
+    ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.dash?1:1.5;ctx.setLineDash(s.dash?[3,3]:[]);ctx.lineJoin='round';
+    hours.forEach(function(h,i){var x=pL+(i/(hours.length-1))*cW,y=pT+cH*(1-s.vals[i]/maxV);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.stroke();ctx.setLineDash([]);
+  });
+}
+
+document.getElementById('st-csv').addEventListener('click',function(){
+  var month=document.getElementById('st-month').value;if(!month){alert('먼저 조회해주세요');return;}
+  var days=getMonthDays(month);
+  var rows=[['업체','시간대'].concat(days.map(function(d){return d.slice(5);}))];
+  G.bizList.forEach(function(b){
+    var bd={};try{bd=JSON.parse(localStorage.getItem('psb_'+b.id+'_'+month)||'{}');}catch(e){}
+    for(var h=0;h<24;h++){var row=[b.name,h+'시'];days.forEach(function(day){var s=bd[day]&&bd[day][h];row.push(s&&s.n>0?(s.on/s.n).toFixed(1):'');});rows.push(row);}
+  });
+  dlCSV(rows,'stats_'+month+'.csv');
+});
+document.getElementById('st-del').addEventListener('click',function(){
+  var month=document.getElementById('st-month').value;if(!month){alert('월을 선택해주세요');return;}
+  if(!confirm(month+' 데이터를 삭제할까요?'))return;
+  localStorage.removeItem('ps_'+month);
+  G.bizList.forEach(function(b){localStorage.removeItem('psb_'+b.id+'_'+month);});
+  document.getElementById('st-calc').click();
+});
+
+// ── 매출 ───────────────────────────────────────────
+function getSetting(bizId){var def={price:1500,seats:0,cost:0};try{return Object.assign({},def,JSON.parse(localStorage.getItem('ss_'+bizId)||'{}'));}catch(e){return def;}}
+function saveSetting(bizId,s){try{localStorage.setItem('ss_'+bizId,JSON.stringify(s));}catch(e){}}
+function renderSalesSettings(){
+  var el=document.getElementById('sales-settings');if(!el)return;
+  el.innerHTML=G.bizList.map(function(b){
+    var s=getSetting(b.id);var seats=s.seats||bizIPs(b).length||0;
+    return '<div class="price-card">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+b.color+'"></div><span style="font-size:13px;font-weight:700">'+esc(b.name)+'</span></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +'<div><lbl>시간당 요금(원)</lbl><input type="number" value="'+s.price+'" min="0" data-sid="'+b.id+'" data-sf="price"></div>'
+      +'<div><lbl>좌석 수</lbl><input type="number" value="'+seats+'" min="0" data-sid="'+b.id+'" data-sf="seats"></div>'
+      +'<div style="grid-column:1/-1"><lbl>일 고정비용(원)</lbl><input type="number" value="'+s.cost+'" min="0" data-sid="'+b.id+'" data-sf="cost"></div>'
+      +'</div></div>';
+  }).join('');
+}
+document.getElementById('sales-settings').addEventListener('change',function(e){
+  var t=e.target,sid=t.dataset.sid,sf=t.dataset.sf;if(!sid||!sf)return;
+  var s=getSetting(parseInt(sid));s[sf]=parseFloat(t.value)||0;saveSetting(parseInt(sid),s);
+});
+function initSalesTab(){
+  var el=document.getElementById('sa-month');if(el&&!el.value)el.value=monthStr();
+  renderSalesSettings();
+}
+document.getElementById('sa-calc').addEventListener('click',function(){
+  var month=document.getElementById('sa-month').value;if(!month){alert('조회 월을 선택해주세요');return;}
+  var days=getMonthDays(month),hours=getHours();
+  var unitH=parseFloat(document.getElementById('sa-unit').value);
+  var bizSales=[],totSales=0,totProfit=0;
+  G.bizList.forEach(function(b){
+    var s=getSetting(b.id);var price=s.price*unitH,cost=s.cost||0;
+    var bd={};try{bd=JSON.parse(localStorage.getItem('psb_'+b.id+'_'+month)||'{}');}catch(e){}
+    var daily=days.map(function(day){
+      var ds=0;hours.forEach(function(h){var sl=bd[day]&&bd[day][h];if(sl&&sl.n>0)ds+=sl.on/sl.n*price;});
+      return {day:day,sales:Math.round(ds),cost:Math.round(cost),profit:Math.round(ds-cost)};
+    });
+    var mSales=daily.reduce(function(a,d){return a+d.sales;},0);
+    var mCost=daily.reduce(function(a,d){return a+d.cost;},0);
+    bizSales.push({biz:b,daily:daily,mSales:mSales,mCost:mCost,mProfit:mSales-mCost});
+    totSales+=mSales;totProfit+=mSales-mCost;
+  });
+  G.salesData=bizSales;G.salesDays=days;
+  var hasData=bizSales.some(function(bd){return bd.mSales>0;});
+  document.getElementById('sa-empty').style.display=hasData?'none':'';
+  ['sa-cards','sa-chart-sec','sa-tbl-sec'].forEach(function(id){document.getElementById(id).style.display=hasData?'':'none';});
+  if(!hasData)return;
+  document.getElementById('sa-cards').innerHTML=
+    '<div class="card"><div class="card-l">월 총매출</div><div class="card-v c-ac2" style="font-size:16px">'+won(totSales)+'</div></div>'+
+    '<div class="card"><div class="card-l">월 순이익</div><div class="card-v" style="font-size:16px;color:'+(totProfit>=0?'var(--ac2)':'var(--err)')+'">'+won(totProfit)+'</div></div>'+
+    '<div class="card"><div class="card-l">일 평균</div><div class="card-v c-warn" style="font-size:16px">'+won(Math.round(totSales/days.length))+'</div></div>'+
+    '<div class="card"><div class="card-l">업체 수</div><div class="card-v c-ac">'+G.bizList.length+'개</div></div>';
+  var cTabEl=document.getElementById('sa-chart-tabs');cTabEl.innerHTML='';var chartView='sales';
+  function makeChartTab(label,val,color){
+    var btn=document.createElement('button');btn.className='htab'+(val===chartView?' on':'');btn.textContent=label;
+    btn.style.cssText='background:'+color+'22;border-color:'+color+';color:'+color;
+    btn.addEventListener('click',function(){chartView=val;cTabEl.querySelectorAll('.htab').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');drawSalesBar(bizSales,days,chartView);});
+    cTabEl.appendChild(btn);
+  }
+  makeChartTab('매출','sales','var(--ac)');makeChartTab('순이익','profit','var(--ac2)');
+  cTabEl.querySelector('.htab').classList.add('on');drawSalesBar(bizSales,days,'sales');
+  G.salesSelId='all';var bTabEl=document.getElementById('sa-biz-tabs');bTabEl.innerHTML='';
+  function makeBizTab(label,id,color){
+    var btn=document.createElement('button');btn.className='htab'+(id===G.salesSelId?' on':'');btn.textContent=label;
+    btn.style.cssText='background:'+color+'22;border-color:'+color+';color:'+color;
+    btn.addEventListener('click',function(){G.salesSelId=id;bTabEl.querySelectorAll('.htab').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');drawSalesTable(bizSales,days,G.salesSelId);});
+    bTabEl.appendChild(btn);
+  }
+  makeBizTab('전체','all','var(--ac)');G.bizList.forEach(function(b){makeBizTab(b.name,b.id,b.color);});
+  drawSalesTable(bizSales,days,'all');
+});
+function drawSalesBar(bizSales,days,type){
+  var canvas=document.getElementById('sa-bar');
+  var W=Math.max(canvas.parentElement.clientWidth||320,days.length*20+60),H=160,dpr=window.devicePixelRatio||1;
+  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  var ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  var pL=46,pR=10,pT=20,pB=30,cW=W-pL-pR,cH=H-pT-pB;
+  var dayTotals=days.map(function(day,di){var t=0;bizSales.forEach(function(bd){var ds=bd.daily[di];t+=type==='profit'?ds.profit:ds.sales;});return t;});
+  var maxV=Math.max.apply(null,dayTotals.concat([1]));
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#1e3a5f';ctx.lineWidth=1;
+  [0,.5,1].forEach(function(r){var y=pT+cH*(1-r);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(pL+cW,y);ctx.stroke();ctx.fillStyle='#94a3b8';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText(won(Math.round(maxV*r)),pL-2,y+3);});
+  var barW=Math.max(6,Math.min(18,cW/days.length-3)),gap=cW/days.length;
+  days.forEach(function(day,di){
+    var x=pL+di*gap+gap/2-barW/2,stackY=pT+cH;
+    bizSales.forEach(function(bd){var v=type==='profit'?bd.daily[di].profit:bd.daily[di].sales;if(v<=0)return;var bh=Math.max(1,v/maxV*cH);stackY-=bh;ctx.fillStyle=bd.biz.color;ctx.globalAlpha=0.85;ctx.fillRect(x,stackY,barW,bh);ctx.globalAlpha=1;});
+    ctx.fillStyle='#94a3b8';ctx.font='8px monospace';ctx.textAlign='center';ctx.fillText(parseInt(day.slice(8)),pL+di*gap+gap/2,H-8);
+  });
+  var lx=pL;bizSales.forEach(function(bd){ctx.fillStyle=bd.biz.color;ctx.globalAlpha=0.85;ctx.fillRect(lx,6,8,7);ctx.globalAlpha=1;ctx.fillStyle=bd.biz.color;ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(bd.biz.name,lx+11,13);lx+=ctx.measureText(bd.biz.name).width+24;});
+}
+function drawSalesTable(bizSales,days,selId){
+  var wd=['일','월','화','수','목','금','토'];
+  var filtered=selId==='all'?bizSales:bizSales.filter(function(bd){return bd.biz.id===selId;});
+  var thead=document.getElementById('sa-thead');var tbody=document.getElementById('sa-tbody');
+  thead.innerHTML='<tr><th>날짜</th><th>요일</th>'+filtered.map(function(bd){return '<th style="color:'+bd.biz.color+'">'+esc(bd.biz.name)+' 매출</th><th style="color:'+bd.biz.color+'">순이익</th>';}).join('')+(filtered.length>1?'<th style="color:var(--ac)">합계</th><th style="color:var(--ac2)">합계이익</th>':'')+'</tr>';
+  var mTot=new Array(filtered.length).fill(0),mPTot=new Array(filtered.length).fill(0);
+  var rows=days.map(function(day,di){
+    var dt=new Date(day),wc=dt.getDay()===0?'var(--err)':dt.getDay()===6?'var(--ac)':'var(--tx2)';
+    var ts=0,tp=0;
+    var tds=filtered.map(function(bd,bi){var ds=bd.daily[di];mTot[bi]+=ds.sales;mPTot[bi]+=ds.profit;ts+=ds.sales;tp+=ds.profit;return '<td>'+wonFull(ds.sales)+'</td><td style="color:'+(ds.profit>=0?'var(--ac2)':'var(--err)')+'">'+wonFull(ds.profit)+'</td>';}).join('');
+    return '<tr><td style="color:var(--tx2)">'+day.slice(5)+'</td><td style="color:'+wc+';font-weight:700">'+wd[dt.getDay()]+'</td>'+tds+(filtered.length>1?'<td style="color:var(--ac);font-weight:700">'+wonFull(ts)+'</td><td style="color:'+(tp>=0?'var(--ac2)':'var(--err)')+';font-weight:700">'+wonFull(tp)+'</td>':'')+'</tr>';
+  }).join('');
+  var gT=mTot.reduce(function(a,b){return a+b;},0),gP=mPTot.reduce(function(a,b){return a+b;},0);
+  var sumRow='<tr class="stbl-sum"><td colspan="2" style="color:var(--ac)">월합계</td>'+filtered.map(function(bd,bi){return '<td style="color:var(--ac2)">'+wonFull(mTot[bi])+'</td><td style="color:'+(mPTot[bi]>=0?'var(--ac2)':'var(--err)')+'">'+wonFull(mPTot[bi])+'</td>';}).join('')+(filtered.length>1?'<td style="color:var(--ac)">'+wonFull(gT)+'</td><td style="color:'+(gP>=0?'var(--ac2)':'var(--err)')+'">'+wonFull(gP)+'</td>':'')+'</tr>';
+  tbody.innerHTML=rows+sumRow;
+}
+document.getElementById('sa-csv').addEventListener('click',function(){
+  if(!G.salesData||!G.salesDays){alert('먼저 계산해주세요');return;}
+  var wd=['일','월','화','수','목','금','토'];
+  var header=['날짜','요일'];G.salesData.forEach(function(bd){header.push(bd.biz.name+' 매출(원)');header.push(bd.biz.name+' 순이익(원)');});header.push('합계매출(원)');header.push('합계순이익(원)');
+  var rows=[header];
+  G.salesDays.forEach(function(day,di){var dt=new Date(day),row=[day.slice(5),wd[dt.getDay()]],ts=0,tp=0;G.salesData.forEach(function(bd){var ds=bd.daily[di];row.push(ds.sales);row.push(ds.profit);ts+=ds.sales;tp+=ds.profit;});row.push(ts);row.push(tp);rows.push(row);});
+  dlCSV(rows,'sales_'+document.getElementById('sa-month').value+'.csv');
+});
+
+// ── 업체/샘플 ──────────────────────────────────────
+document.getElementById('btn-add-biz').addEventListener('click',function(){addBiz();});
+document.getElementById('btn-open-sample').addEventListener('click',function(){updateSampleSel();document.getElementById('modal-sample').classList.add('on');});
+document.getElementById('btn-sample').addEventListener('click',function(){updateSampleSel();document.getElementById('modal-sample').classList.add('on');});
+document.getElementById('modal-close').addEventListener('click',function(){document.getElementById('modal-sample').classList.remove('on');});
+document.getElementById('modal-sample').addEventListener('click',function(e){if(e.target===this)this.classList.remove('on');});
+function updateSampleSel(){var sel=document.getElementById('sample-biz');sel.innerHTML=G.bizList.map(function(b){return '<option value="'+b.id+'">'+esc(b.name)+'</option>';}).join('');}
+document.querySelectorAll('#modal-sample [data-prefix]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var prefix=btn.dataset.prefix;var gid=parseInt(document.getElementById('sample-biz').value);
+    var b=G.bizList.find(function(x){return x.id===gid;});if(!b)return;
+    var ips=[];for(var i=1;i<=200;i++)ips.push(prefix+'.'+i);
+    b.ipRange=ips.join(',');renderBizList();document.getElementById('modal-sample').classList.remove('on');
+  });
+});
+document.getElementById('cr-apply').addEventListener('click',function(){
+  var prefix=document.getElementById('cr-p').value.trim();
+  var s=parseInt(document.getElementById('cr-s').value);var e=parseInt(document.getElementById('cr-e').value);
+  if(!prefix||isNaN(s)||isNaN(e)){alert('올바르게 입력하세요');return;}
+  var gid=parseInt(document.getElementById('sample-biz').value);
+  var b=G.bizList.find(function(x){return x.id===gid;});if(!b)return;
+  var ips=[];for(var i=s;i<=Math.min(e,s+499);i++)ips.push(prefix+'.'+i);
+  b.ipRange=ips.join(',');renderBizList();document.getElementById('modal-sample').classList.remove('on');
+});
+
+window.addEventListener('resize',function(){
+  if(document.getElementById('tab-stats').style.display!=='none'){
+    var m=document.getElementById('st-month').value;if(m)document.getElementById('st-calc').click();
+  }
+});
+
+
+// ── 서버 연동 ──────────────────────────────────────
+var SERVER_URL = window.location.origin;
+var serverMode = true;
+
+// 서버에서 결과 가져오기
+function fetchResults() {
+  fetch(SERVER_URL + '/api/results')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      // 서버 결과를 G.hosts 형태로 변환
+      G.hosts = [];
+      var idx = 1;
+      data.results.forEach(function(bd){
+        bd.results.forEach(function(r){
+          G.hosts.push({
+            idx: idx++, ip: r.ip, bizId: bd.biz.id, bizName: bd.biz.name, bizColor: bd.biz.color,
+            status: r.status || 'pending', ping: r.ping, lastCheck: r.lastCheck ? new Date(r.lastCheck) : null,
+            history: [], attempts: 1, successes: r.status === 'online' || r.status === 'warn' ? 1 : 0
+          });
+        });
+      });
+      renderMonitor();
+    })
+    .catch(function(e){ console.log('서버 연결 실패:', e); });
+}
+
+// 서버에 업체 저장
+function saveBizToServer() {
+  fetch(SERVER_URL + '/api/biz', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bizList: G.bizList })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ console.log('업체 저장:', d); });
+}
+
+// 서버 자동스캔 설정
+function setServerAutoScan(intervalMs) {
+  fetch(SERVER_URL + '/api/auto-scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ intervalMs: intervalMs })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ console.log('자동스캔 설정:', d); });
+}
+
+// 수동 스캔 요청
+function requestServerScan() {
+  fetch(SERVER_URL + '/api/scan', { method: 'POST' });
+}
+
+// 서버 통계 가져오기
+function fetchServerStats(month, bizId) {
+  if (bizId) {
+    return fetch(SERVER_URL + '/api/stats/biz/' + bizId + '/' + month).then(function(r){ return r.json(); });
+  }
+  return fetch(SERVER_URL + '/api/stats/' + month).then(function(r){ return r.json(); });
+}
+
+// 자동 결과 폴링 (5초마다)
+setInterval(fetchResults, 5000);
+// 초기 로드
+setTimeout(fetchResults, 1000);
+
+// ── 초기화 ─────────────────────────────────────────
+addBiz('A 업체','#00d4ff','192.168.1.1~50');
+addBiz('B 업체','#00ff88','192.168.2.1~50');
+addBiz('C 업체','#ffaa00','192.168.3.1~50');
+var m=monthStr();
+document.getElementById('st-month').value=m;
+document.getElementById('sa-month').value=m;
+// 자동검색 OFF 버튼 기본 선택
+document.querySelector('[data-auto="off"]').classList.add('on');
+</script>
+</body>
+</html>

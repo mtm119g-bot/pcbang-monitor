@@ -590,10 +590,12 @@ function loadAdminData() {
         var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString('ko-KR') : '-';
         var statusBadge = u.isActive ? '<span class="badge-on">활성</span>' : '<span class="badge-off">정지</span>';
         var scanBadge = u.intervalMs>0 ? '<span class="badge-on">'+u.intervalMs/60000+'분</span>' : '<span class="badge-stop">OFF</span>';
+        var uid = u._id;
+        var uname = u.name;
         var btns = u.role==='admin' ? '<span style="color:var(--ac);font-size:10px">관리자</span>' :
-          '<button class="ubtn" onclick="toggleUser(''+u._id+'')">'+( u.isActive?'정지':'활성')+'</button>'+
-          '<button class="ubtn" onclick="resetPw(''+u._id+'')">PW초기화</button>'+
-          '<button class="ubtn" style="color:var(--err)" onclick="deleteUser(''+u._id+'',''+u.name+'')">삭제</button>';
+          '<button class="ubtn" data-action="toggle" data-uid="'+uid+'">'+( u.isActive?'정지':'활성')+'</button>'+
+          '<button class="ubtn" data-action="reset" data-uid="'+uid+'">PW초기화</button>'+
+          '<button class="ubtn" style="color:var(--err)" data-action="delete" data-uid="'+uid+'" data-uname="'+uname+'">삭제</button>';
         return '<tr>'
           +'<td style="color:var(--ac)">'+u.username+'</td>'
           +'<td>'+u.name+'</td>'
@@ -604,6 +606,19 @@ function loadAdminData() {
           +'<td style="display:flex;gap:4px">'+btns+'</td>'
           +'</tr>';
       }).join('');
+
+      // 이벤트 위임으로 버튼 클릭 처리
+      tbody.onclick = function(e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var action = btn.dataset.action;
+        var uid = btn.dataset.uid;
+        var uname = btn.dataset.uname;
+        if (action === 'toggle') toggleUser(uid);
+        else if (action === 'reset') resetPw(uid);
+        else if (action === 'delete') deleteUser(uid, uname);
+      };
+
     });
 }
 

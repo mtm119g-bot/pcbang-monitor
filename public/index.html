@@ -505,9 +505,23 @@ function authFetch(url, options) {
 }
 
 function showAuth() {
+  // 스캔 중지
+  if(G.running) stopMonitor();
+  // 화면 전환
   document.getElementById('auth-screen').style.display = '';
   document.getElementById('user-bar').style.display = 'none';
   document.getElementById('main-app').style.display = 'none';
+  // 로그인 폼 초기화
+  document.getElementById('login-id').value = '';
+  document.getElementById('login-pw').value = '';
+  document.getElementById('login-err').textContent = '';
+  document.getElementById('login-form').style.display = '';
+  document.getElementById('register-form').style.display = 'none';
+  // G 초기화
+  G.bizList = [];
+  G.hosts = [];
+  G.currentUser = null;
+  currentUser = null;
 }
 
 function showApp(user) {
@@ -605,8 +619,7 @@ document.getElementById('goto-login').addEventListener('click', function(){
 // 로그아웃
 document.getElementById('btn-logout').addEventListener('click', function(){
   if (!confirm('로그아웃 하시겠습니까?')) return;
-  removeToken(); currentUser = null;
-  stopMonitor();
+  removeToken();
   showAuth();
 });
 

@@ -506,7 +506,7 @@ function authFetch(url, options) {
 
 function showAuth() {
   // 스캔 중지
-  if(G.running) stopMonitor();
+  if(G && G.running) { try { stopMonitor(); } catch(e){} }
   // 화면 전환
   document.getElementById('auth-screen').style.display = '';
   document.getElementById('user-bar').style.display = 'none';
@@ -518,9 +518,7 @@ function showAuth() {
   document.getElementById('login-form').style.display = '';
   document.getElementById('register-form').style.display = 'none';
   // G 초기화
-  G.bizList = [];
-  G.hosts = [];
-  G.currentUser = null;
+  if(G) { G.bizList = []; G.hosts = []; G.currentUser = null; G.running = false; }
   currentUser = null;
 }
 

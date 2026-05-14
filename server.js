@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://svc.sel3.cloudtype.app:32668';
+const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017';
 const JWT_SECRET = process.env.JWT_SECRET || 'pcbang-monitor-secret-2024';
 const PORT = process.env.PORT || 3000;
 
@@ -51,9 +51,18 @@ const statsSchema = new mongoose.Schema({
 });
 statsSchema.index({ userId: 1, bizId: 1, date: 1, hour: 1 }, { unique: true });
 
+// 자동스캔 설정 스키마 - DB에 저장해서 서버 재시작해도 유지
+const autoScanSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, unique: true },
+  intervalMs: { type: Number, default: 0 },
+  enabled: { type: Boolean, default: false },
+  updatedAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.model('User', userSchema);
 const Biz = mongoose.model('Biz', bizSchema);
 const Stats = mongoose.model('Stats', statsSchema);
+const AutoScan = mongoose.model('AutoScan', autoScanSchema);
 
 // ── 유틸 ──────────────────────────────────────────
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -75,14 +84,24 @@ function adminAuth(req, res, next) {
 // ── IP 파싱 ────────────────────────────────────────
 function expandIP(line) {
   line = line.trim();
-  const m = line.match(/^(\d+\.\d+\.\d+\.)(\d+)\s*~\s*(\d+)$/);
-  if (m) { const res=[],s=parseInt(m[2]),e=parseInt(m[3]); if(s<=e&&e<=255) for(let i=s;i<=e;i++) res.push(m[1]+i); return res; }
+  const parts = line.split('~');
+  if (parts.length === 2) {
+    const ipPart = parts[0].trim();
+    const lastDot = ipPart.lastIndexOf('.');
+    const prefix = ipPart.substring(0, lastDot + 1);
+    const start = parseInt(ipPart.substring(lastDot + 1));
+    const end = parseInt(parts[1].trim());
+    const res = [];
+    if (prefix && !isNaN(start) && !isNaN(end) && start <= end && end <= 255)
+      for (let i = start; i <= end; i++) res.push(prefix + i);
+    return res;
+  }
   if (/^\d+\.\d+\.\d+\.\d+$/.test(line)) return [line];
   return [];
 }
 function parseIPs(ipRange) {
   const ips = [];
-  (ipRange||'').split(/[,\n]/).forEach(p => expandIP(p.trim()).forEach(ip => ips.push(ip)));
+  (ipRange || '').split(',').forEach(p => expandIP(p.trim()).forEach(ip => ips.push(ip)));
   return ips;
 }
 
@@ -98,8 +117,8 @@ function pingHost(ip) {
   });
 }
 
-// ── 스캔 상태 ──────────────────────────────────────
-const scanState = {};
+// ── 스캔 상태 (메모리) ─────────────────────────────
+const scanState = {}; // { userId: { results, intervalMs, interval, lastScan } }
 
 async function runScan(userId) {
   const bizList = await Biz.find({ userId });
@@ -107,13 +126,18 @@ async function runScan(userId) {
   const allIPs = [];
   bizList.forEach(b => parseIPs(b.ipRange).forEach(ip => allIPs.push({ ip, bizId: b._id })));
   if (!allIPs.length) return;
-  if (!scanState[userId]) scanState[userId] = { results:{}, intervalMs:0, interval:null };
+  if (!scanState[userId]) scanState[userId] = { results:{}, intervalMs:0, interval:null, lastScan:null };
+
+  console.log(`[${new Date().toLocaleString('ko-KR')}] [${userId}] 스캔 시작 - ${allIPs.length}개 IP`);
+
   for (let i=0; i<allIPs.length; i+=20) {
     const batch = allIPs.slice(i, i+20);
     const results = await Promise.all(batch.map(h => pingHost(h.ip)));
     results.forEach((r,idx) => { scanState[userId].results[r.ip] = {...r, bizId:batch[idx].bizId}; });
   }
+  scanState[userId].lastScan = new Date().toISOString();
   await saveStats(userId, bizList);
+  console.log(`[${new Date().toLocaleString('ko-KR')}] [${userId}] 스캔 완료`);
 }
 
 async function saveStats(userId, bizList) {
@@ -135,12 +159,97 @@ async function saveStats(userId, bizList) {
   }
 }
 
-function setAutoScan(userId, intervalMs) {
-  if (!scanState[userId]) scanState[userId] = {results:{}, intervalMs:0, interval:null};
-  if (scanState[userId].interval) clearInterval(scanState[userId].interval);
-  scanState[userId].intervalMs = intervalMs;
-  if (intervalMs > 0) { runScan(userId); scanState[userId].interval = setInterval(()=>runScan(userId), intervalMs); }
+// ── 자동스캔 설정 (정각/30분 맞춤) ──────────────────
+function getNextScanTime(intervalMs) {
+  const now = new Date();
+  const ms = now.getTime();
+  if (intervalMs === 1800000) {
+    // 30분 단위 - 매시 0분, 30분에 맞춤
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    const msInHour = (minutes * 60 + seconds) * 1000 + now.getMilliseconds();
+    if (minutes < 30) {
+      // 다음 :30분
+      return 30 * 60 * 1000 - msInHour;
+    } else {
+      // 다음 :00분 (다음 시간 정각)
+      return 60 * 60 * 1000 - msInHour;
+    }
+  } else if (intervalMs === 3600000) {
+    // 1시간 단위 - 매시 정각에 맞춤
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    const msInHour = (minutes * 60 + seconds) * 1000 + now.getMilliseconds();
+    return 60 * 60 * 1000 - msInHour;
+  } else if (intervalMs === 7200000) {
+    // 2시간 단위 - 짝수 시 정각에 맞춤
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    const nextEvenHour = hours % 2 === 0 ? hours + 2 : hours + 1;
+    const nextTime = new Date(now);
+    nextTime.setHours(nextEvenHour, 0, 0, 0);
+    return nextTime.getTime() - now.getTime();
+  }
+  return intervalMs;
 }
+
+function setAutoScan(userId, intervalMs) {
+  if (!scanState[userId]) scanState[userId] = {results:{}, intervalMs:0, interval:null, timeout:null, lastScan:null};
+  if (scanState[userId].interval) {
+    clearInterval(scanState[userId].interval);
+    clearTimeout(scanState[userId].timeout);
+  }
+  scanState[userId].intervalMs = intervalMs;
+
+  if (intervalMs > 0) {
+    // 즉시 1회 스캔
+    runScan(userId);
+
+    if (intervalMs === 1800000 || intervalMs === 3600000 || intervalMs === 7200000) {
+      // 정각/30분에 맞춰서 시작
+      const waitMs = getNextScanTime(intervalMs);
+      const waitMin = Math.round(waitMs / 60000);
+      console.log(`[${userId}] 자동스캔 설정: ${intervalMs/60000}분 간격 (${waitMin}분 후 정각에 시작)`);
+
+      scanState[userId].timeout = setTimeout(() => {
+        runScan(userId);
+        scanState[userId].interval = setInterval(() => runScan(userId), intervalMs);
+      }, waitMs);
+    } else {
+      // 일반 간격
+      scanState[userId].interval = setInterval(() => runScan(userId), intervalMs);
+      console.log(`[${userId}] 자동스캔 설정: ${intervalMs/60000}분 간격`);
+    }
+  } else {
+    console.log(`[${userId}] 자동스캔 중지`);
+  }
+}
+
+// ── 서버 시작 시 DB에서 자동스캔 설정 복원 ────────
+async function restoreAutoScans() {
+  try {
+    await mongoose.connection.once('open', async () => {
+      const settings = await AutoScan.find({ enabled: true });
+      console.log(`자동스캔 복원: ${settings.length}개 사용자`);
+      for (const s of settings) {
+        setAutoScan(String(s.userId), s.intervalMs);
+      }
+    });
+  } catch(e) { console.error('자동스캔 복원 실패:', e); }
+}
+
+mongoose.connection.on('connected', () => {
+  setTimeout(async () => {
+    try {
+      const settings = await AutoScan.find({ enabled: true });
+      console.log(`자동스캔 복원: ${settings.length}개 사용자`);
+      for (const s of settings) {
+        setAutoScan(String(s.userId), s.intervalMs);
+      }
+    } catch(e) { console.error('자동스캔 복원 실패:', e); }
+  }, 2000);
+});
 
 // ══════════════════════════════════════════════════
 // API
@@ -179,13 +288,11 @@ app.post('/api/auth/login', async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
-// 내정보
 app.get('/api/auth/me', auth, async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   res.json(user);
 });
 
-// 비밀번호 변경
 app.put('/api/auth/password', auth, async (req, res) => {
   try {
     const {oldPassword, newPassword} = req.body;
@@ -207,10 +314,10 @@ app.post('/api/biz', auth, async (req, res) => {
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
-// 스캔
+// 스캔 결과
 app.get('/api/results', auth, async (req, res) => {
   const bizList = await Biz.find({userId:req.user.id});
-  const state = scanState[req.user.id]||{results:{}};
+  const state = scanState[req.user.id]||{results:{}, lastScan:null};
   const results = bizList.map(b => {
     const ips = parseIPs(b.ipRange);
     const br = ips.map(ip => state.results[ip]||{ip, bizId:b._id, status:'pending', ping:null, lastCheck:null});
@@ -220,11 +327,43 @@ app.get('/api/results', auth, async (req, res) => {
     const avg=pings.length?Math.round(pings.reduce((a,b)=>a+b,0)/pings.length):0;
     return {biz:b, results:br, on, off, avg, total:ips.length};
   });
-  res.json({results, lastScan:new Date().toISOString()});
+  res.json({results, lastScan:state.lastScan, autoScan: (scanState[req.user.id]?.intervalMs||0) > 0, intervalMs: scanState[req.user.id]?.intervalMs||0});
 });
+
+// 수동 스캔
 app.post('/api/scan', auth, (req, res) => { runScan(req.user.id); res.json({ok:true}); });
-app.post('/api/auto-scan', auth, (req, res) => { setAutoScan(req.user.id, req.body.intervalMs||0); res.json({ok:true, intervalMs:req.body.intervalMs||0}); });
-app.get('/api/auto-scan', auth, (req, res) => { const s=scanState[req.user.id]||{intervalMs:0}; res.json({intervalMs:s.intervalMs, running:s.intervalMs>0}); });
+
+// 자동스캔 설정 - DB에 저장해서 서버 재시작해도 유지
+app.post('/api/auto-scan', auth, async (req, res) => {
+  const intervalMs = req.body.intervalMs || 0;
+  setAutoScan(req.user.id, intervalMs);
+  // DB에 저장
+  await AutoScan.findOneAndUpdate(
+    {userId: req.user.id},
+    {intervalMs, enabled: intervalMs > 0, updatedAt: new Date()},
+    {upsert: true}
+  );
+  res.json({ok:true, intervalMs, enabled: intervalMs > 0});
+});
+
+app.get('/api/auto-scan', auth, async (req, res) => {
+  const s = scanState[req.user.id]||{intervalMs:0};
+  const dbSetting = await AutoScan.findOne({userId: req.user.id});
+  // 다음 스캔 예정 시간 계산
+  let nextScanAt = null;
+  if (s.intervalMs > 0) {
+    const waitMs = getNextScanTime(s.intervalMs);
+    nextScanAt = new Date(Date.now() + waitMs).toISOString();
+  }
+  res.json({
+    intervalMs: s.intervalMs,
+    running: s.intervalMs > 0,
+    lastScan: s.lastScan,
+    nextScanAt: nextScanAt,
+    dbEnabled: dbSetting?.enabled || false,
+    dbIntervalMs: dbSetting?.intervalMs || 0
+  });
+});
 
 // 통계
 app.get('/api/stats/:month', auth, async (req, res) => {
@@ -244,13 +383,30 @@ app.delete('/api/stats/:month', auth, async (req, res) => {
   res.json({ok:true});
 });
 
-// ── 관리자 API ─────────────────────────────────────
+// GeoIP
+app.get('/api/geoip/:ip', auth, async (req, res) => {
+  try {
+    const ip = req.params.ip;
+    const url = `http://ip-api.com/json/${ip}?lang=ko&fields=status,city,regionName,country,lat,lon,isp`;
+    const data = await new Promise((resolve, reject) => {
+      http.get(url, (r) => {
+        let body = '';
+        r.on('data', (chunk) => body += chunk);
+        r.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { reject(e); } });
+      }).on('error', reject);
+    });
+    res.json(data);
+  } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+// 관리자
 app.get('/api/admin/stats', auth, adminAuth, async (req, res) => {
   const totalUsers=await User.countDocuments();
   const activeUsers=await User.countDocuments({isActive:true});
   const totalBiz=await Biz.countDocuments();
   const scanning=Object.values(scanState).filter(s=>s.intervalMs>0).length;
-  res.json({totalUsers, activeUsers, totalBiz, scanning});
+  const autoScanUsers=await AutoScan.countDocuments({enabled:true});
+  res.json({totalUsers, activeUsers, totalBiz, scanning, autoScanUsers});
 });
 
 app.get('/api/admin/users', auth, adminAuth, async (req, res) => {
@@ -258,7 +414,8 @@ app.get('/api/admin/users', auth, adminAuth, async (req, res) => {
   const result = await Promise.all(users.map(async u => {
     const bizCount = await Biz.countDocuments({userId:u._id});
     const state = scanState[String(u._id)]||{intervalMs:0};
-    return {...u.toObject(), bizCount, autoScan:state.intervalMs>0, intervalMs:state.intervalMs};
+    const autoScan = await AutoScan.findOne({userId:u._id});
+    return {...u.toObject(), bizCount, autoScan:state.intervalMs>0, intervalMs:state.intervalMs, dbAutoScan:autoScan?.enabled||false};
   }));
   res.json(result);
 });
@@ -277,6 +434,7 @@ app.delete('/api/admin/users/:id', auth, adminAuth, async (req, res) => {
   if (user.role==='admin') return res.status(400).json({error:'관리자는 삭제할 수 없습니다'});
   await Biz.deleteMany({userId:user._id});
   await Stats.deleteMany({userId:user._id});
+  await AutoScan.deleteOne({userId:user._id});
   await User.deleteOne({_id:user._id});
   res.json({ok:true});
 });
@@ -288,35 +446,12 @@ app.put('/api/admin/users/:id/password', auth, adminAuth, async (req, res) => {
   res.json({ok:true});
 });
 
-// 관리자 계정 초기 생성
 app.post('/api/admin/init', async (req, res) => {
   const exists = await User.findOne({role:'admin'});
   if (exists) return res.status(400).json({error:'관리자가 이미 존재합니다'});
   const {username='admin', password='admin1234', name='관리자'} = req.body;
   const admin = await User.create({username, password:await bcrypt.hash(password,10), name, role:'admin'});
   res.json({ok:true, message:'관리자 계정이 생성되었습니다', username:admin.username});
-});
-
-// IP 위치 조회 (서버에서 ip-api.com 호출)
-app.get('/api/geoip/:ip', auth, async (req, res) => {
-  try {
-    const ip = req.params.ip;
-    const http = require('http');
-    const url = `http://ip-api.com/json/${ip}?lang=ko&fields=status,city,regionName,country,lat,lon,isp`;
-    const data = await new Promise((resolve, reject) => {
-      http.get(url, (r) => {
-        let body = '';
-        r.on('data', (chunk) => body += chunk);
-        r.on('end', () => {
-          try { resolve(JSON.parse(body)); }
-          catch(e) { reject(e); }
-        });
-      }).on('error', reject);
-    });
-    res.json(data);
-  } catch(e) {
-    res.status(500).json({error: e.message});
-  }
 });
 
 app.get('/api/health', (req, res) => res.json({ok:true, db:mongoose.connection.readyState===1?'connected':'disconnected'}));

@@ -253,7 +253,7 @@ canvas{display:block;}
 
 <!-- 자동검색 바 -->
 <div class="auto-bar">
-  <span class="auto-label">자동검색</span>
+  <span class="auto-label">서버 자동스캔</span>
   <div class="auto-btns">
     <button class="auto-btn" data-auto="off">OFF</button>
     <button class="auto-btn" data-auto="1800000">30분</button>
@@ -261,6 +261,7 @@ canvas{display:block;}
     <button class="auto-btn" data-auto="7200000">2시간</button>
   </div>
   <span class="auto-cd" id="auto-cd" style="display:none">-</span>
+  <span id="server-scan-status" style="font-size:10px;color:var(--tx2)"></span>
 </div>
 
 <!-- 글로벌 컨트롤 -->
@@ -504,6 +505,8 @@ function showApp(user) {
   }
   // 서버에서 업체 로드
   loadBizFromServer();
+  // 자동스캔 상태 로드
+  setTimeout(loadAutoScanStatus, 500);
 }
 
 function loadBizFromServer() {
@@ -709,16 +712,54 @@ document.querySelectorAll('.auto-btn').forEach(function(btn){
     document.querySelectorAll('.auto-btn').forEach(function(b){b.classList.remove('on');});
     btn.classList.add('on');
     var val=btn.dataset.auto;
-    stopAutoScan();
-    setServerAutoScan(val==='off'?0:parseInt(val));
-    if(val!=='off'){
-      G.autoInterval=parseInt(val);
-      startAutoScan(G.autoInterval);
-    } else {
-      document.getElementById('auto-cd').style.display='none';
-    }
+    var intervalMs = val==='off' ? 0 : parseInt(val);
+    // 서버에 자동스캔 설정 저장 (브라우저 꺼도 유지)
+    authFetch('/api/auto-scan', {
+      method:'POST',
+      body: JSON.stringify({intervalMs: intervalMs})
+    }).then(function(r){return r.json();})
+    .then(function(d){
+      // 설정 후 상태 새로고침
+      setTimeout(loadAutoScanStatus, 1000);
+    });
   });
 });
+
+// 로그인 후 서버 자동스캔 상태 불러오기
+function fmtNextScan(isoStr) {
+  if (!isoStr) return '';
+  var d = new Date(isoStr);
+  return d.getHours() + '시 ' + String(d.getMinutes()).padStart(2,'0') + '분';
+}
+
+function loadAutoScanStatus() {
+  authFetch('/api/auto-scan')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var statusEl = document.getElementById('server-scan-status');
+      var cdEl = document.getElementById('auto-cd');
+      if(d.dbEnabled && d.dbIntervalMs > 0){
+        var mins = d.dbIntervalMs/60000;
+        var nextStr = d.nextScanAt ? ' · 다음: ' + fmtNextScan(d.nextScanAt) : '';
+        statusEl.textContent = '✅ 서버 자동스캔 중 (' + mins + '분 간격' + nextStr + ')';
+        statusEl.style.color = 'var(--ac2)';
+        cdEl.style.display='';
+        cdEl.textContent = d.nextScanAt ? '다음: ' + fmtNextScan(d.nextScanAt) : mins+'분 간격';
+        document.querySelectorAll('.auto-btn').forEach(function(b){
+          b.classList.remove('on');
+          if(b.dataset.auto === String(d.dbIntervalMs)) b.classList.add('on');
+        });
+      } else {
+        document.querySelectorAll('.auto-btn').forEach(function(b){b.classList.remove('on');});
+        document.querySelector('[data-auto="off"]').classList.add('on');
+        statusEl.textContent = '⏹ 자동스캔 OFF';
+        statusEl.style.color = 'var(--tx2)';
+        cdEl.style.display='none';
+      }
+      // 1분마다 상태 갱신
+      setTimeout(loadAutoScanStatus, 60000);
+    });
+}
 
 function startAutoScan(iv){
   G.autoNextScan=Date.now()+iv;
@@ -871,19 +912,14 @@ document.getElementById('btn-start').addEventListener('click',function(){
       var lbl=document.getElementById('iv').options[document.getElementById('iv').selectedIndex].text;
       var badge=document.getElementById('iv-badge');
       badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
-      // 브라우저 직접 핑 대신 서버에 스캔 요청
+      // 서버에 즉시 스캔 요청
       requestServerScan();
-      startCD(iv);
-      // 서버 자동스캔도 설정
-      authFetch(SERVER_URL + '/api/auto-scan', {
-        method: 'POST',
-        body: JSON.stringify({intervalMs: iv})
-      });
-      // 5초마다 결과 폴링
+      // 5초마다 결과 폴링 (브라우저 표시용)
       G.ivId = setInterval(function(){
-        G.nextScan = Date.now() + iv;
         fetchResults();
       }, 5000);
+      // 카운트다운 시작
+      startCD(iv);
     });
 });
 
@@ -1336,6 +1372,11 @@ function fetchResults() {
         if(newBizList.length > 0) G.bizList = newBizList;
       }
       renderMonitor();
+      // 마지막 스캔 시간 표시
+      if(data.lastScan) {
+        var lastTime = new Date(data.lastScan);
+        document.getElementById('hd-st').innerHTML = '마지막 스캔: ' + lastTime.toLocaleTimeString('ko-KR');
+      }
     })
     .catch(function(e){ console.log('서버 연결 실패:', e); });
 }

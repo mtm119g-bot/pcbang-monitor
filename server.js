@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   name: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
-  grade: { type: Number, default: 1, min: 1, max: 4 }, // 1:기본(3개) 2:6개 3:무제한 4:관리자
+  grade: { type: Number, default: 1, min: 1, max: 4 }, // 1:Free(3개) 2:Basic(10개) 3:Pro(무제한) 4:관리자
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   lastLogin: { type: Date },
@@ -294,7 +294,7 @@ app.get('/api/auth/me', auth, async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   if (!user) return res.status(404).json({error:'사용자를 찾을 수 없습니다'});
   const grade = user.grade || 1;
-  const maxBiz = grade === 1 ? 3 : grade === 2 ? 6 : 9999;
+  const maxBiz = grade === 1 ? 3 : grade === 2 ? 10 : 9999;
   res.json({...user.toObject(), maxBiz});
 });
 
@@ -315,7 +315,7 @@ app.post('/api/biz', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     const grade = user?.grade || 1;
-    const maxBiz = grade === 1 ? 3 : grade === 2 ? 6 : grade >= 3 ? 9999 : 3;
+    const maxBiz = grade === 1 ? 3 : grade === 2 ? 10 : grade >= 3 ? 9999 : 3;
     const bizList = (req.body.bizList || []).slice(0, maxBiz);
     await Biz.deleteMany({userId:req.user.id});
     const created = await Biz.insertMany(bizList.map(b=>({userId:req.user.id, name:b.name, color:b.color, ipRange:b.ipRange||''})));
@@ -425,7 +425,7 @@ app.get('/api/admin/users', auth, adminAuth, async (req, res) => {
     const state = scanState[String(u._id)]||{intervalMs:0};
     const autoScan = await AutoScan.findOne({userId:u._id});
     const grade = u.grade || 1;
-    const maxBiz = grade === 1 ? 3 : grade === 2 ? 6 : grade >= 3 ? 9999 : 3;
+    const maxBiz = grade === 1 ? 3 : grade === 2 ? 10 : grade >= 3 ? 9999 : 3;
     return {...u.toObject(), bizCount, autoScan:state.intervalMs>0, intervalMs:state.intervalMs, dbAutoScan:autoScan?.enabled||false, maxBiz};
   }));
   res.json(result);

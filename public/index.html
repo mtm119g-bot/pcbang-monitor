@@ -517,7 +517,7 @@ function showApp(user) {
   document.getElementById('user-bar').style.display = '';
   document.getElementById('main-app').style.display = '';
   document.getElementById('user-name-txt').textContent = user.name;
-  if (user.role === 'admin') {
+  if (user.role === 'admin' || user.grade === 4) {
     document.getElementById('tab-admin-btn').style.display = '';
   }
   // 서버에서 업체 로드
@@ -1437,7 +1437,7 @@ function fetchResults() {
           });
         });
       });
-      // G.bizList 업데이트 (위치 정보 유지)
+      // G.bizList 이름/색상만 업데이트 (위치 정보 유지, 중복 없이)
       if(data.results && data.results.length > 0) {
         data.results.forEach(function(bd){
           if(!bd.biz) return;
@@ -1446,10 +1446,9 @@ function fetchResults() {
           if(existing) {
             existing.name = bd.biz.name;
             existing.color = bd.biz.color;
-            // ipRange는 유지 (위치 정보 포함)
-          } else {
-            G.bizList.push({id:bid, name:bd.biz.name, color:bd.biz.color, ipRange:bd.biz.ipRange||''});
+            // ipRange, id는 유지 (위치 정보 포함)
           }
+          // push 하지 않음 - loadBizFromServer에서만 추가
         });
       }
       renderMonitor();

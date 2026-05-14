@@ -27,9 +27,11 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   name: { type: String, required: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  grade: { type: Number, default: 1, min: 1, max: 4 }, // 1:기본(3개) 2:6개 3:무제한 4:관리자
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
-  lastLogin: { type: Date }
+  lastLogin: { type: Date },
+  memo: { type: String, default: '' } // 관리자 메모
 });
 
 const bizSchema = new mongoose.Schema({
@@ -290,7 +292,10 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', auth, async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
-  res.json(user);
+  if (!user) return res.status(404).json({error:'사용자를 찾을 수 없습니다'});
+  const grade = user.grade || 1;
+  const maxBiz = grade === 1 ? 3 : grade === 2 ? 6 : 9999;
+  res.json({...user.toObject(), maxBiz});
 });
 
 app.put('/api/auth/password', auth, async (req, res) => {
@@ -308,9 +313,13 @@ app.put('/api/auth/password', auth, async (req, res) => {
 app.get('/api/biz', auth, async (req, res) => res.json(await Biz.find({userId:req.user.id})));
 app.post('/api/biz', auth, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    const grade = user?.grade || 1;
+    const maxBiz = grade === 1 ? 3 : grade === 2 ? 6 : grade >= 3 ? 9999 : 3;
+    const bizList = (req.body.bizList || []).slice(0, maxBiz);
     await Biz.deleteMany({userId:req.user.id});
-    const created = await Biz.insertMany(req.body.bizList.map(b=>({userId:req.user.id, name:b.name, color:b.color, ipRange:b.ipRange||''})));
-    res.json({ok:true, count:created.length});
+    const created = await Biz.insertMany(bizList.map(b=>({userId:req.user.id, name:b.name, color:b.color, ipRange:b.ipRange||''})));
+    res.json({ok:true, count:created.length, maxBiz, grade});
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
@@ -415,9 +424,30 @@ app.get('/api/admin/users', auth, adminAuth, async (req, res) => {
     const bizCount = await Biz.countDocuments({userId:u._id});
     const state = scanState[String(u._id)]||{intervalMs:0};
     const autoScan = await AutoScan.findOne({userId:u._id});
-    return {...u.toObject(), bizCount, autoScan:state.intervalMs>0, intervalMs:state.intervalMs, dbAutoScan:autoScan?.enabled||false};
+    const grade = u.grade || 1;
+    const maxBiz = grade === 1 ? 3 : grade === 2 ? 6 : grade >= 3 ? 9999 : 3;
+    return {...u.toObject(), bizCount, autoScan:state.intervalMs>0, intervalMs:state.intervalMs, dbAutoScan:autoScan?.enabled||false, maxBiz};
   }));
   res.json(result);
+});
+
+// 회원 등급 변경
+app.put('/api/admin/users/:id/grade', auth, adminAuth, async (req, res) => {
+  const { grade } = req.body;
+  if (![1,2,3,4].includes(parseInt(grade))) return res.status(400).json({error:'등급은 1~4 사이여야 합니다'});
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({error:'회원을 찾을 수 없습니다'});
+  user.grade = parseInt(grade);
+  if (grade === 4) user.role = 'admin';
+  else user.role = 'user';
+  await user.save();
+  res.json({ok:true, grade:user.grade, role:user.role});
+});
+
+// 회원 메모 수정
+app.put('/api/admin/users/:id/memo', auth, adminAuth, async (req, res) => {
+  await User.findByIdAndUpdate(req.params.id, {memo: req.body.memo || ''});
+  res.json({ok:true});
 });
 
 app.put('/api/admin/users/:id/toggle', auth, adminAuth, async (req, res) => {

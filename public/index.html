@@ -414,17 +414,33 @@ canvas{display:block;}
   <div class="admin-wrap">
     <div class="admin-cards" id="admin-stat-cards"></div>
     <div class="sec">
-      <div class="sec-t">👥 전체 회원 목록</div>
+      <div class="sec-t">👥 전체 회원 목록
+        <button class="btn bg bsm" id="btn-admin-refresh" style="margin-left:auto">🔄 새로고침</button>
+      </div>
+      <!-- 검색 -->
+      <div style="margin-bottom:10px;display:flex;gap:8px;">
+        <input type="text" id="admin-search" placeholder="아이디/이름 검색..." style="flex:1;font-size:12px;">
+        <select id="admin-grade-filter" style="width:100px;font-size:12px;">
+          <option value="">전체 등급</option>
+          <option value="1">1등급</option>
+          <option value="2">2등급</option>
+          <option value="3">3등급</option>
+          <option value="4">4등급(관리자)</option>
+        </select>
+      </div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <table class="admin-tbl">
           <thead>
             <tr>
-              <th>아이디</th><th>이름</th><th>업체수</th>
+              <th>아이디</th><th>이름</th><th>등급</th><th>업체수/한도</th>
               <th>자동스캔</th><th>마지막 로그인</th><th>상태</th><th>관리</th>
             </tr>
           </thead>
           <tbody id="admin-user-tbody"></tbody>
         </table>
+      </div>
+      <div style="font-size:10px;color:var(--tx2);margin-top:8px;">
+        💡 1등급: 업체 3개 · 2등급: 6개 · 3등급: 무제한 · 4등급: 관리자
       </div>
     </div>
   </div>
@@ -496,6 +512,7 @@ function showAuth() {
 
 function showApp(user) {
   currentUser = user;
+  G.currentUser = user;
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('user-bar').style.display = '';
   document.getElementById('main-app').style.display = '';
@@ -600,6 +617,8 @@ document.getElementById('btn-change-pw').addEventListener('click', function(){
 });
 
 // ── 관리자 기능 ────────────────────────────────────
+var _allAdminUsers = [];
+
 function loadAdminData() {
   authFetch('/api/admin/stats')
     .then(function(r){ return r.json(); })
@@ -613,29 +632,61 @@ function loadAdminData() {
   authFetch('/api/admin/users')
     .then(function(r){ return r.json(); })
     .then(function(users){
-      var tbody = document.getElementById('admin-user-tbody');
+      _allAdminUsers = users;
+      renderAdminUsers(users);
+    });
+}
+
+function renderAdminUsers(users) {
+  var search = (document.getElementById('admin-search').value||'').toLowerCase();
+  var gradeFilter = document.getElementById('admin-grade-filter').value;
+  var filtered = users.filter(function(u){
+    if(search && !u.username.toLowerCase().includes(search) && !u.name.toLowerCase().includes(search)) return false;
+    if(gradeFilter && String(u.grade||1) !== gradeFilter) return false;
+    return true;
+  });
+
+  var gradeLabels = {1:'1등급',2:'2등급',3:'3등급',4:'관리자'};
+  var gradeColors = {1:'var(--tx2)',2:'var(--warn)',3:'var(--ac)',4:'var(--err)'};
+  var gradeDesc = {1:'업체 3개',2:'업체 6개',3:'무제한',4:'관리자'};
+
+  var tbody = document.getElementById('admin-user-tbody');
       tbody.innerHTML = users.map(function(u){
         var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString('ko-KR') : '-';
         var statusBadge = u.isActive ? '<span class="badge-on">활성</span>' : '<span class="badge-off">정지</span>';
         var scanBadge = u.intervalMs>0 ? '<span class="badge-on">'+u.intervalMs/60000+'분</span>' : '<span class="badge-stop">OFF</span>';
         var uid = u._id;
         var uname = u.name;
-        var btns = u.role==='admin' ? '<span style="color:var(--ac);font-size:10px">관리자</span>' :
-          '<button class="ubtn" data-action="toggle" data-uid="'+uid+'">'+( u.isActive?'정지':'활성')+'</button>'+
-          '<button class="ubtn" data-action="reset" data-uid="'+uid+'">PW초기화</button>'+
-          '<button class="ubtn" style="color:var(--err)" data-action="delete" data-uid="'+uid+'" data-uname="'+uname+'">삭제</button>';
+        var grade = u.grade || 1;
+        var gradeLabel = gradeLabels[grade]||'1등급';
+        var gradeColor = gradeColors[grade]||'var(--tx2)';
+        var maxBizText = u.maxBiz >= 9999 ? '무제한' : (u.maxBiz||3)+'개';
+        var btns = '<div style="display:flex;gap:3px;flex-wrap:wrap;">'
+          + '<select class="ubtn" style="font-size:10px;padding:2px 4px;" data-action="grade" data-uid="'+uid+'">'
+          + '<option value="1"'+(grade===1?' selected':'')+'>1등급</option>'
+          + '<option value="2"'+(grade===2?' selected':'')+'>2등급</option>'
+          + '<option value="3"'+(grade===3?' selected':'')+'>3등급</option>'
+          + '<option value="4"'+(grade===4?' selected':'')+'>4등급(관)자</option>'
+          + '</select>';
+        if(u.role !== 'admin') {
+          btns += '<button class="ubtn" data-action="toggle" data-uid="'+uid+'">'+( u.isActive?'정지':'활성')+'</button>'
+            + '<button class="ubtn" data-action="reset" data-uid="'+uid+'">PW</button>'
+            + '<button class="ubtn" style="color:var(--err)" data-action="delete" data-uid="'+uid+'" data-uname="'+uname+'">삭제</button>';
+        }
+        btns += '</div>';
         return '<tr>'
           +'<td style="color:var(--ac)">'+u.username+'</td>'
           +'<td>'+u.name+'</td>'
-          +'<td style="text-align:center">'+u.bizCount+'개</td>'
+          +'<td><span style="background:'+gradeColor+'22;color:'+gradeColor+';border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+gradeLabel+'</span><div style="font-size:9px;color:var(--tx2)">'+gradeDesc[grade]+'</div></td>'
+          +'<td style="text-align:center">'+u.bizCount+'/'+maxBizText+'</td>'
           +'<td>'+scanBadge+'</td>'
           +'<td style="color:var(--tx2);font-size:10px">'+lastLogin+'</td>'
           +'<td>'+statusBadge+'</td>'
-          +'<td style="display:flex;gap:4px">'+btns+'</td>'
+          +'<td>'+btns+'</td>'
           +'</tr>';
       }).join('');
 
-      // 이벤트 위임으로 버튼 클릭 처리
+      // 이벤트 위임으로 버튼/셀렉트 처리
       tbody.onclick = function(e) {
         var btn = e.target.closest('[data-action]');
         if (!btn) return;
@@ -646,7 +697,22 @@ function loadAdminData() {
         else if (action === 'reset') resetPw(uid);
         else if (action === 'delete') deleteUser(uid, uname);
       };
+      tbody.onchange = function(e) {
+        var sel = e.target.closest('[data-action="grade"]');
+        if (!sel) return;
+        changeGrade(sel.dataset.uid, sel.value);
+      };
 
+
+}
+
+function changeGrade(id, grade) {
+  if(!confirm('등급을 ' + grade + '등급으로 변경할까요?')) return;
+  authFetch('/api/admin/users/'+id+'/grade', {method:'PUT', body:JSON.stringify({grade:parseInt(grade)})})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.ok) loadAdminData();
+      else alert(data.error||'변경 실패');
     });
 }
 
@@ -1012,7 +1078,12 @@ document.querySelectorAll('.tab').forEach(function(btn){
     });
     if(tab==='sales')initSalesTab();
     if(tab==='settings')renderBizList();
-    if(tab==='admin')loadAdminData();
+    if(tab==='admin'){
+      loadAdminData();
+      document.getElementById('admin-search').oninput = function(){ renderAdminUsers(_allAdminUsers); };
+      document.getElementById('admin-grade-filter').onchange = function(){ renderAdminUsers(_allAdminUsers); };
+      document.getElementById('btn-admin-refresh').onclick = function(){ loadAdminData(); };
+    }
     if(tab==='map')initMap();
   });
 });
@@ -1284,7 +1355,14 @@ document.getElementById('sa-csv').addEventListener('click',function(){
 });
 
 // ── 업체/샘플 ──────────────────────────────────────
-document.getElementById('btn-add-biz').addEventListener('click',function(){addBiz();});
+document.getElementById('btn-add-biz').addEventListener('click',function(){
+  var maxBiz = G.currentUser && G.currentUser.maxBiz ? G.currentUser.maxBiz : 3;
+  if(G.bizList.length >= maxBiz && maxBiz < 9999){
+    alert('현재 등급(' + (G.currentUser&&G.currentUser.grade||1) + '등급)에서는 최대 ' + maxBiz + '개 업체까지 추가할 수 있습니다.\n등급 업그레이드는 관리자에게 문의하세요.');
+    return;
+  }
+  addBiz();
+});
 
 document.getElementById('btn-save-biz').addEventListener('click',function(){
   var btn=document.getElementById('btn-save-biz');
@@ -1359,17 +1437,20 @@ function fetchResults() {
           });
         });
       });
-      // G.bizList도 서버 결과로 업데이트
-      if(data.results.length > 0) {
-        var newBizList = data.results.map(function(bd){
-          return {
-            id: String(bd.biz._id || bd.biz.id),
-            name: bd.biz.name,
-            color: bd.biz.color,
-            ipRange: bd.biz.ipRange || ''
-          };
+      // G.bizList 업데이트 (위치 정보 유지)
+      if(data.results && data.results.length > 0) {
+        data.results.forEach(function(bd){
+          if(!bd.biz) return;
+          var bid = String(bd.biz._id || bd.biz.id);
+          var existing = G.bizList.find(function(b){ return String(b.id)===bid; });
+          if(existing) {
+            existing.name = bd.biz.name;
+            existing.color = bd.biz.color;
+            // ipRange는 유지 (위치 정보 포함)
+          } else {
+            G.bizList.push({id:bid, name:bd.biz.name, color:bd.biz.color, ipRange:bd.biz.ipRange||''});
+          }
         });
-        if(newBizList.length > 0) G.bizList = newBizList;
       }
       renderMonitor();
       // 마지막 스캔 시간 표시

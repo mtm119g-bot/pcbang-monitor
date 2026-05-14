@@ -1435,8 +1435,8 @@ function refreshMap() {
 
     var repIP = ips[0];
 
-    // ip-api.com으로 위치 조회
-    fetch('https://ip-api.com/json/' + repIP + '?lang=ko&fields=status,city,regionName,country,lat,lon,isp')
+    // 서버를 통해 위치 조회 (HTTPS 우회)
+    authFetch('/api/geoip/' + repIP)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (data.status === 'success') {

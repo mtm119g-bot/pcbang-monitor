@@ -297,6 +297,28 @@ app.post('/api/admin/init', async (req, res) => {
   res.json({ok:true, message:'관리자 계정이 생성되었습니다', username:admin.username});
 });
 
+// IP 위치 조회 (서버에서 ip-api.com 호출)
+app.get('/api/geoip/:ip', auth, async (req, res) => {
+  try {
+    const ip = req.params.ip;
+    const http = require('http');
+    const url = `http://ip-api.com/json/${ip}?lang=ko&fields=status,city,regionName,country,lat,lon,isp`;
+    const data = await new Promise((resolve, reject) => {
+      http.get(url, (r) => {
+        let body = '';
+        r.on('data', (chunk) => body += chunk);
+        r.on('end', () => {
+          try { resolve(JSON.parse(body)); }
+          catch(e) { reject(e); }
+        });
+      }).on('error', reject);
+    });
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({error: e.message});
+  }
+});
+
 app.get('/api/health', (req, res) => res.json({ok:true, db:mongoose.connection.readyState===1?'connected':'disconnected'}));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 

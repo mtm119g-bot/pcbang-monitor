@@ -480,8 +480,21 @@ app.post('/api/admin/init', async (req, res) => {
   const exists = await User.findOne({role:'admin'});
   if (exists) return res.status(400).json({error:'관리자가 이미 존재합니다'});
   const {username='admin', password='admin1234', name='관리자'} = req.body;
-  const admin = await User.create({username, password:await bcrypt.hash(password,10), name, role:'admin'});
+  const admin = await User.create({username, password:await bcrypt.hash(password,10), name, role:'admin', grade:4});
   res.json({ok:true, message:'관리자 계정이 생성되었습니다', username:admin.username});
+});
+
+// 임시 관리자 등급 수정 API (URL 알아야만 접근 가능)
+app.get('/api/setup/make-admin/:username', async (req, res) => {
+  try {
+    const user = await User.findOneAndUpdate(
+      {username: req.params.username},
+      {role: 'admin', grade: 4},
+      {new: true}
+    );
+    if (!user) return res.status(404).json({error:'사용자를 찾을 수 없습니다'});
+    res.json({ok:true, message:user.username+'을 관리자로 설정했습니다', grade:4, role:'admin'});
+  } catch(e) { res.status(500).json({error:e.message}); }
 });
 
 app.get('/api/health', (req, res) => res.json({ok:true, db:mongoose.connection.readyState===1?'connected':'disconnected'}));

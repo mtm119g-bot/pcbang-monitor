@@ -440,7 +440,7 @@ canvas{display:block;}
         </table>
       </div>
       <div style="font-size:10px;color:var(--tx2);margin-top:8px;">
-        💡 1등급: 업체 3개 · 2등급: 6개 · 3등급: 무제한 · 4등급: 관리자
+        💡 1등급: 업체 3개 · 2등급: 10개 · 3등급: 무제한 · 4등급: 관리자
       </div>
     </div>
   </div>
@@ -652,6 +652,7 @@ function loadAdminData() {
   authFetch('/api/admin/users')
     .then(function(r){ return r.json(); })
     .then(function(users){
+      if (!Array.isArray(users)) { console.error('유저 목록 오류:', users); return; }
       _allAdminUsers = users;
       renderAdminUsers(users);
     });
@@ -668,10 +669,10 @@ function renderAdminUsers(users) {
 
   var gradeLabels = {1:'1등급',2:'2등급',3:'3등급',4:'관리자'};
   var gradeColors = {1:'var(--tx2)',2:'var(--warn)',3:'var(--ac)',4:'var(--err)'};
-  var gradeDesc = {1:'업체 3개',2:'업체 6개',3:'무제한',4:'관리자'};
+  var gradeDesc = {1:'업체 3개',2:'업체 10개',3:'무제한',4:'관리자'};
 
   var tbody = document.getElementById('admin-user-tbody');
-      tbody.innerHTML = users.map(function(u){
+      tbody.innerHTML = filtered.map(function(u){
         var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleDateString('ko-KR') : '-';
         var statusBadge = u.isActive ? '<span class="badge-on">활성</span>' : '<span class="badge-off">정지</span>';
         var scanBadge = u.intervalMs>0 ? '<span class="badge-on">'+u.intervalMs/60000+'분</span>' : '<span class="badge-stop">OFF</span>';

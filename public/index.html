@@ -517,13 +517,22 @@ function showApp(user) {
   document.getElementById('user-bar').style.display = '';
   document.getElementById('main-app').style.display = '';
   document.getElementById('user-name-txt').textContent = user.name;
-  if (user.role === 'admin' || user.grade === 4) {
+  if (user.role === 'admin' || parseInt(user.grade) === 4) {
     document.getElementById('tab-admin-btn').style.display = '';
   }
   // 서버에서 업체 로드
   loadBizFromServer();
   // 자동스캔 상태 로드
   setTimeout(loadAutoScanStatus, 500);
+  // 최신 grade 정보 조회
+  authFetch('/api/auth/me').then(function(r){return r.json();}).then(function(me){
+    if(me && me.grade) {
+      G.currentUser = me;
+      if(me.role==='admin' || parseInt(me.grade)===4) {
+        document.getElementById('tab-admin-btn').style.display='';
+      }
+    }
+  });
 }
 
 function loadBizFromServer() {
@@ -980,7 +989,9 @@ document.getElementById('btn-start').addEventListener('click',function(){
       badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
       // 서버에 즉시 스캔 요청
       requestServerScan();
-      // 5초마다 결과 폴링 (브라우저 표시용)
+      // 즉시 결과 조회 시작
+      fetchResults();
+      // 5초마다 결과 폴링
       G.ivId = setInterval(function(){
         fetchResults();
       }, 5000);
@@ -1412,7 +1423,6 @@ var serverMode = true;
 
 // 서버에서 결과 가져오기
 function fetchResults() {
-  if(!G.running) return;
   authFetch(SERVER_URL + '/api/results')
     .then(function(r){ return r.json(); })
     .then(function(data){

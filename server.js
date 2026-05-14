@@ -270,8 +270,8 @@ app.post('/api/auth/register', async (req, res) => {
       {userId:user._id, name:'B 업체', color:'#00ff88'},
       {userId:user._id, name:'C 업체', color:'#ffaa00'}
     ]);
-    const token = jwt.sign({id:user._id, username:user.username, name:user.name, role:user.role}, JWT_SECRET, {expiresIn:'7d'});
-    res.json({token, user:{id:user._id, username:user.username, name:user.name, role:user.role}});
+    const token = jwt.sign({id:user._id, username:user.username, name:user.name, role:user.role, grade:user.grade||1}, JWT_SECRET, {expiresIn:'7d'});
+    res.json({token, user:{id:user._id, username:user.username, name:user.name, role:user.role, grade:user.grade||1}});
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 
@@ -285,8 +285,8 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user.isActive) return res.status(403).json({error:'정지된 계정입니다. 관리자에게 문의하세요'});
     if (!await bcrypt.compare(password, user.password)) return res.status(400).json({error:'아이디 또는 비밀번호가 틀렸습니다'});
     user.lastLogin = new Date(); await user.save();
-    const token = jwt.sign({id:user._id, username:user.username, name:user.name, role:user.role}, JWT_SECRET, {expiresIn:'7d'});
-    res.json({token, user:{id:user._id, username:user.username, name:user.name, role:user.role}});
+    const token = jwt.sign({id:user._id, username:user.username, name:user.name, role:user.role, grade:user.grade||1}, JWT_SECRET, {expiresIn:'7d'});
+    res.json({token, user:{id:user._id, username:user.username, name:user.name, role:user.role, grade:user.grade||1}});
   } catch(e) { res.status(500).json({error:e.message}); }
 });
 

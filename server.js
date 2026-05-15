@@ -20,6 +20,17 @@ const PORT = process.env.PORT || 3000;
 mongoose.connect(MONGO_URL)
   .then(() => {
     console.log('MongoDB 연결 성공');
+    // 자동스캔 복원
+    setTimeout(async () => {
+      try {
+        const settings = await AutoScan.find({ enabled: true });
+        console.log(`자동스캔 복원: ${settings.length}개 사용자`);
+        for (const s of settings) {
+          setAutoScan(String(s.userId), s.intervalMs);
+        }
+      } catch(e) { console.error('자동스캔 복원 실패:', e); }
+    }, 1000);
+    // 구독 만료 체크
     checkExpiredSubs();
     setInterval(checkExpiredSubs, 1000 * 60 * 60);
   })
@@ -246,31 +257,6 @@ function setAutoScan(userId, intervalMs) {
     console.log(`[${userId}] 자동스캔 중지`);
   }
 }
-
-// ── 서버 시작 시 DB에서 자동스캔 설정 복원 ────────
-async function restoreAutoScans() {
-  try {
-    await mongoose.connection.once('open', async () => {
-      const settings = await AutoScan.find({ enabled: true });
-      console.log(`자동스캔 복원: ${settings.length}개 사용자`);
-      for (const s of settings) {
-        setAutoScan(String(s.userId), s.intervalMs);
-      }
-    });
-  } catch(e) { console.error('자동스캔 복원 실패:', e); }
-}
-
-mongoose.connection.on('connected', () => {
-  setTimeout(async () => {
-    try {
-      const settings = await AutoScan.find({ enabled: true });
-      console.log(`자동스캔 복원: ${settings.length}개 사용자`);
-      for (const s of settings) {
-        setAutoScan(String(s.userId), s.intervalMs);
-      }
-    } catch(e) { console.error('자동스캔 복원 실패:', e); }
-  }, 2000);
-});
 
 // ══════════════════════════════════════════════════
 // API

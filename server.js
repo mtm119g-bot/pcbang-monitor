@@ -61,10 +61,25 @@ const autoScanSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// 구독 스키마
+const subSchema = new mongoose.Schema({
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  plan:      { type: String, enum: ['basic','pro'], required: true },
+  cycle:     { type: String, enum: ['monthly','yearly'], required: true },
+  status:    { type: String, enum: ['active','cancelled','expired'], default: 'active' },
+  orderId:   { type: String, required: true, unique: true },
+  paymentKey:{ type: String },
+  amount:    { type: Number, required: true },
+  startAt:   { type: Date, default: Date.now },
+  expireAt:  { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.model('User', userSchema);
 const Biz = mongoose.model('Biz', bizSchema);
 const Stats = mongoose.model('Stats', statsSchema);
 const AutoScan = mongoose.model('AutoScan', autoScanSchema);
+const Sub = mongoose.model('Sub', subSchema);
 
 // ── 유틸 ──────────────────────────────────────────
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -495,6 +510,97 @@ app.get('/api/setup/make-admin/:username', async (req, res) => {
     if (!user) return res.status(404).json({error:'사용자를 찾을 수 없습니다'});
     res.json({ok:true, message:user.username+'을 관리자로 설정했습니다', grade:4, role:'admin'});
   } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+// ── 구독 플랜 정의 ─────────────────────────────────
+const PLANS = {
+  basic:  { monthly: 9900,  yearly: 94800,  grade: 2 }, // 연간 = 7900*12
+  pro:    { monthly: 100000, yearly: 960000, grade: 3 }  // 연간 = 80000*12
+};
+
+// 내 구독 정보 조회
+app.get('/api/sub/me', auth, async (req, res) => {
+  try {
+    const sub = await Sub.findOne({ userId: req.user.id, status: 'active' }).sort({ createdAt: -1 });
+    res.json({ sub: sub || null });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// 결제 성공 후 검증 & 구독 등록
+app.post('/api/sub/confirm', auth, async (req, res) => {
+  try {
+    const { paymentKey, orderId, amount, plan, cycle } = req.body;
+    if (!paymentKey || !orderId || !amount || !plan || !cycle)
+      return res.status(400).json({ error: '필수 파라미터 누락' });
+
+    const planInfo = PLANS[plan];
+    if (!planInfo) return res.status(400).json({ error: '잘못된 플랜' });
+
+    const expectedAmount = planInfo[cycle];
+    if (parseInt(amount) !== expectedAmount)
+      return res.status(400).json({ error: '결제 금액 불일치' });
+
+    // 토스페이먼츠 결제 승인 요청
+    const TOSS_SECRET = process.env.TOSS_SECRET_KEY || '';
+    const authHeader = 'Basic ' + Buffer.from(TOSS_SECRET + ':').toString('base64');
+    const tossRes = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
+      method: 'POST',
+      headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentKey, orderId, amount: parseInt(amount) })
+    });
+    const tossData = await tossRes.json();
+    if (!tossRes.ok) return res.status(400).json({ error: tossData.message || '결제 승인 실패' });
+
+    // 기존 구독 만료 처리
+    await Sub.updateMany({ userId: req.user.id, status: 'active' }, { status: 'cancelled' });
+
+    // 만료일 계산
+    const expireAt = new Date();
+    if (cycle === 'monthly') expireAt.setMonth(expireAt.getMonth() + 1);
+    else expireAt.setFullYear(expireAt.getFullYear() + 1);
+
+    // 구독 저장
+    await Sub.create({ userId: req.user.id, plan, cycle, orderId, paymentKey, amount: parseInt(amount), expireAt, status: 'active' });
+
+    // 등급 업그레이드
+    await User.findByIdAndUpdate(req.user.id, { grade: planInfo.grade });
+
+    res.json({ ok: true, plan, cycle, expireAt });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// 구독 취소
+app.post('/api/sub/cancel', auth, async (req, res) => {
+  try {
+    const sub = await Sub.findOne({ userId: req.user.id, status: 'active' });
+    if (!sub) return res.status(400).json({ error: '활성 구독이 없습니다' });
+    await Sub.findByIdAndUpdate(sub._id, { status: 'cancelled' });
+    await User.findByIdAndUpdate(req.user.id, { grade: 1 });
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// 구독 만료 체크 (매일 자정 실행)
+async function checkExpiredSubs() {
+  const expired = await Sub.find({ status: 'active', expireAt: { $lt: new Date() } });
+  for (const sub of expired) {
+    await Sub.findByIdAndUpdate(sub._id, { status: 'expired' });
+    await User.findByIdAndUpdate(sub.userId, { grade: 1 });
+    console.log(`구독 만료 처리: userId=${sub.userId}`);
+  }
+}
+setInterval(checkExpiredSubs, 1000 * 60 * 60); // 1시간마다 체크
+checkExpiredSubs();
+
+
+
+// 토스페이먼츠 결제 성공/실패 리다이렉트
+app.get('/payment/success', (req, res) => {
+  const { paymentKey, orderId, amount, plan, cycle } = req.query;
+  res.redirect(`/?paymentKey=${paymentKey}&orderId=${orderId}&amount=${amount}&plan=${plan}&cycle=${cycle}`);
+});
+app.get('/payment/fail', (req, res) => {
+  res.redirect('/?paymentFail=1');
 });
 
 app.get('/api/health', (req, res) => res.json({ok:true, db:mongoose.connection.readyState===1?'connected':'disconnected'}));

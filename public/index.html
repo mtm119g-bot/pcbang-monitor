@@ -188,6 +188,7 @@ canvas{display:block;}
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://js.tosspayments.com/v1/payment"></script>
 
 </head>
 <body>
@@ -310,6 +311,7 @@ canvas{display:block;}
   <button class="tab" data-tab="sales">💰 매출</button>
   <button class="tab" data-tab="map">🗺️ 지도</button>
   <button class="tab" data-tab="settings">⚙️ 설정</button>
+  <button class="tab" data-tab="sub">💳 구독</button>
   <button class="tab" id="tab-admin-btn" data-tab="admin" style="display:none">🔧 관리자</button>
 </div>
 
@@ -408,6 +410,80 @@ canvas{display:block;}
   </div>
 </div>
 
+
+<!-- 구독 탭 -->
+<div id="tab-sub" style="display:none">
+  <div class="spad">
+
+    <!-- 현재 구독 상태 -->
+    <div class="sec" id="sub-status-sec">
+      <div class="sec-t">📋 현재 구독 상태</div>
+      <div id="sub-status-content">
+        <div style="text-align:center;padding:16px;color:var(--tx2);font-size:13px;">로딩 중...</div>
+      </div>
+    </div>
+
+    <!-- 플랜 선택 -->
+    <div id="sub-plans-sec">
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">
+        <button id="sub-cycle-monthly" class="btn bp bsm sub-cycle-btn" style="min-width:80px;">월간</button>
+        <button id="sub-cycle-yearly" class="btn bg bsm sub-cycle-btn" style="min-width:80px;">연간 <span style="color:var(--ac2);font-size:10px;">20%↓</span></button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+
+        <!-- Free -->
+        <div class="sec" style="border:1px solid var(--bd);margin-bottom:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--tx2);">🆓 Free</div>
+              <div style="font-size:12px;color:var(--tx2);margin-top:4px;">업체 3개 · 기본 기능</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:700;color:var(--tx);">무료</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Basic -->
+        <div class="sec" style="border:1px solid var(--warn);margin-bottom:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--warn);">⭐ Basic</div>
+              <div style="font-size:12px;color:var(--tx2);margin-top:4px;">업체 10개 · 자동스캔 · 통계</div>
+            </div>
+            <div style="text-align:right;">
+              <div id="basic-price" style="font-size:22px;font-weight:700;color:var(--warn);">₩9,900<span style="font-size:12px;font-weight:400;color:var(--tx2);">/월</span></div>
+              <div id="basic-price-sub" style="font-size:10px;color:var(--tx2);"></div>
+            </div>
+          </div>
+          <button id="btn-pay-basic" class="btn bsm" style="width:100%;margin-top:12px;background:var(--warn);color:#000;font-weight:700;">Basic 구독하기</button>
+        </div>
+
+        <!-- Pro -->
+        <div class="sec" style="border:2px solid var(--ac);margin-bottom:0;position:relative;">
+          <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--ac);color:#000;font-size:10px;font-weight:700;padding:2px 10px;border-radius:20px;">BEST</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:4px;">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--ac);">👑 Pro</div>
+              <div style="font-size:12px;color:var(--tx2);margin-top:4px;">업체 무제한 · 모든 기능 · 우선 지원</div>
+            </div>
+            <div style="text-align:right;">
+              <div id="pro-price" style="font-size:22px;font-weight:700;color:var(--ac);">₩100,000<span style="font-size:12px;font-weight:400;color:var(--tx2);">/월</span></div>
+              <div id="pro-price-sub" style="font-size:10px;color:var(--tx2);"></div>
+            </div>
+          </div>
+          <button id="btn-pay-pro" class="btn bp bsm" style="width:100%;margin-top:12px;font-weight:700;">Pro 구독하기</button>
+        </div>
+
+      </div>
+      <div style="font-size:10px;color:var(--tx2);text-align:center;margin-top:12px;">
+        💡 연간 결제 시 20% 할인 · 언제든지 취소 가능
+      </div>
+    </div>
+
+  </div>
+</div>
 
 <!-- 관리자 탭 -->
 <div id="tab-admin" style="display:none">
@@ -1761,7 +1837,146 @@ fetchResults = function() {
   }
 };
 
-// ── 초기화 ─────────────────────────────────────────
+// ── 구독 탭 ───────────────────────────────────────
+var SUB_CLIENT_KEY = 'test_ck_AQ92ymxN34Y2da9JGY9PVajRKXvd';
+var subCycle = 'monthly'; // monthly | yearly
+var PLAN_PRICE = {
+  basic:  { monthly: 9900,   yearly: 94800  },
+  pro:    { monthly: 100000, yearly: 960000 }
+};
+
+function updateSubPriceUI() {
+  var isYearly = subCycle === 'yearly';
+  document.getElementById('sub-cycle-monthly').className = 'btn bsm sub-cycle-btn' + (isYearly ? ' bg' : ' bp');
+  document.getElementById('sub-cycle-yearly').className  = 'btn bsm sub-cycle-btn' + (isYearly ? ' bp' : ' bg');
+
+  var basicM = PLAN_PRICE.basic.monthly;
+  var proM   = PLAN_PRICE.pro.monthly;
+
+  if (isYearly) {
+    document.getElementById('basic-price').innerHTML = '₩7,900<span style="font-size:12px;font-weight:400;color:var(--tx2);">/월</span>';
+    document.getElementById('basic-price-sub').textContent = '연간 ₩94,800 일괄 결제 (20% 할인)';
+    document.getElementById('pro-price').innerHTML = '₩80,000<span style="font-size:12px;font-weight:400;color:var(--tx2);">/월</span>';
+    document.getElementById('pro-price-sub').textContent = '연간 ₩960,000 일괄 결제 (20% 할인)';
+  } else {
+    document.getElementById('basic-price').innerHTML = '₩9,900<span style="font-size:12px;font-weight:400;color:var(--tx2);">/월</span>';
+    document.getElementById('basic-price-sub').textContent = '';
+    document.getElementById('pro-price').innerHTML = '₩100,000<span style="font-size:12px;font-weight:400;color:var(--tx2);">/월</span>';
+    document.getElementById('pro-price-sub').textContent = '';
+  }
+}
+
+document.getElementById('sub-cycle-monthly').addEventListener('click', function() {
+  subCycle = 'monthly'; updateSubPriceUI();
+});
+document.getElementById('sub-cycle-yearly').addEventListener('click', function() {
+  subCycle = 'yearly'; updateSubPriceUI();
+});
+
+function loadSubStatus() {
+  authFetch('/api/sub/me')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('sub-status-content');
+      var sub = data.sub;
+      if (!sub) {
+        el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;">'
+          + '<span style="background:rgba(148,163,184,.15);color:var(--tx2);border-radius:4px;padding:3px 10px;font-size:12px;font-weight:700;">Free</span>'
+          + '<span style="font-size:13px;color:var(--tx2);">현재 무료 플랜 사용 중</span></div>';
+        return;
+      }
+      var planLabel = sub.plan === 'pro' ? '👑 Pro' : '⭐ Basic';
+      var planColor = sub.plan === 'pro' ? 'var(--ac)' : 'var(--warn)';
+      var cycleLabel = sub.cycle === 'yearly' ? '연간' : '월간';
+      var expire = new Date(sub.expireAt).toLocaleDateString('ko-KR');
+      el.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;padding:4px 0;">'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<span style="background:'+planColor+'22;color:'+planColor+';border-radius:4px;padding:3px 10px;font-size:12px;font-weight:700;">'+planLabel+'</span>'
+        + '<span style="font-size:12px;color:var(--tx2);">'+cycleLabel+' 구독 중</span></div>'
+        + '<div style="font-size:12px;color:var(--tx2);">만료일: <b style="color:var(--tx);">'+expire+'</b></div>'
+        + '<button id="btn-sub-cancel" class="btn bg bsm" style="color:var(--err);border-color:var(--err);width:fit-content;margin-top:4px;">구독 취소</button>'
+        + '</div>';
+      document.getElementById('btn-sub-cancel') && document.getElementById('btn-sub-cancel').addEventListener('click', cancelSub);
+    })
+    .catch(function(){ });
+}
+
+function cancelSub() {
+  if (!confirm('구독을 취소하시겠습니까?\n취소 후 만료일까지는 계속 이용 가능합니다.')) return;
+  authFetch('/api/sub/cancel', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.ok) { alert('구독이 취소되었습니다.'); loadSubStatus(); }
+      else alert(data.error || '취소 실패');
+    });
+}
+
+function startPayment(plan) {
+  if (!currentUser) { alert('로그인이 필요합니다.'); return; }
+  var amount = PLAN_PRICE[plan][subCycle];
+  var planLabel = plan === 'pro' ? 'Pro' : 'Basic';
+  var cycleLabel = subCycle === 'yearly' ? '연간' : '월간';
+  var orderId = 'pcbang-' + plan + '-' + subCycle + '-' + Date.now();
+
+  var toss = TossPayments(SUB_CLIENT_KEY);
+  toss.requestPayment('카드', {
+    amount: amount,
+    orderId: orderId,
+    orderName: 'PC방 모니터 ' + planLabel + ' ' + cycleLabel,
+    customerName: currentUser.name || currentUser.username,
+    successUrl: window.location.origin + '/payment/success?plan=' + plan + '&cycle=' + subCycle,
+    failUrl:    window.location.origin + '/payment/fail',
+  }).catch(function(err) {
+    if (err.code !== 'USER_CANCEL') alert('결제 오류: ' + err.message);
+  });
+}
+
+document.getElementById('btn-pay-basic').addEventListener('click', function() { startPayment('basic'); });
+document.getElementById('btn-pay-pro').addEventListener('click',   function() { startPayment('pro'); });
+
+// 결제 성공 리다이렉트 처리
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var paymentKey = params.get('paymentKey');
+  var orderId    = params.get('orderId');
+  var amount     = params.get('amount');
+  var plan       = params.get('plan');
+  var cycle      = params.get('cycle');
+  if (paymentKey && orderId && amount && plan && cycle) {
+    // URL 정리
+    history.replaceState({}, '', '/');
+    // 결제 확인 요청
+    authFetch('/api/sub/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ paymentKey: paymentKey, orderId: orderId, amount: parseInt(amount), plan: plan, cycle: cycle })
+    }).then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        alert('✅ 구독이 완료되었습니다!\n플랜: ' + (plan==='pro'?'Pro':'Basic') + ' / ' + (cycle==='yearly'?'연간':'월간'));
+        // 유저 정보 갱신
+        authFetch('/api/auth/me').then(function(r){return r.json();}).then(function(me){
+          if(me && me.grade) { currentUser = me; G.currentUser = me; }
+          loadSubStatus();
+        });
+      } else {
+        alert('❌ 결제 확인 실패: ' + (data.error || '알 수 없는 오류'));
+      }
+    });
+  }
+})();
+
+// 탭 전환 시 구독 상태 로드
+var _origTabClick = null;
+document.querySelectorAll('.tab[data-tab]').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    if (tab.dataset.tab === 'sub') {
+      loadSubStatus();
+      updateSubPriceUI();
+    }
+  });
+});
+
+
 var m=monthStr();
 document.getElementById('st-month').value=m;
 document.getElementById('sa-month').value=m;

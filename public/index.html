@@ -1172,7 +1172,7 @@ document.querySelectorAll('.tab').forEach(function(btn){
     document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
     btn.classList.add('on');
     var tab=btn.dataset.tab;
-    ['monitor','stats','sales','map','settings','admin'].forEach(function(t){
+    ['monitor','stats','sales','map','settings','sub','admin'].forEach(function(t){
       document.getElementById('tab-'+t).style.display=t===tab?'':'none';
     });
     if(tab==='sales')initSalesTab();

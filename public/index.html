@@ -326,19 +326,46 @@ canvas{display:block;}
 <!-- 통계 -->
 <div id="tab-stats" style="display:none">
   <div class="spad">
-    <div class="sctrl">
+    <!-- 뷰 선택 -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn bp bsm st-view-btn" data-view="day">📅 일별</button>
+      <button class="btn bg bsm st-view-btn" data-view="hourly">⏰ 시간대별</button>
+      <button class="btn bg bsm st-view-btn" data-view="month">📆 월별</button>
+      <button class="btn bg bsm st-view-btn" data-view="year">🗓 연별</button>
+    </div>
+
+    <!-- 필터 -->
+    <div class="sec" style="margin-bottom:12px;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-        <div class="cg" style="min-width:140px"><lbl>조회 월</lbl><input type="month" id="st-month"></div>
-        <button class="btn bp bsm" id="st-calc">📊 조회</button>
-        <button class="btn be bsm" id="st-csv">📥 CSV</button>
-        <button class="btn bg bsm" id="st-del" style="color:var(--err);border-color:var(--err)">🗑</button>
+        <div class="cg" id="st2-date-wrap" style="min-width:140px"><lbl>날짜</lbl><input type="date" id="st2-date"></div>
+        <div class="cg" id="st2-month-wrap" style="min-width:140px;display:none"><lbl>월</lbl><input type="month" id="st2-month"></div>
+        <div class="cg" id="st2-year-wrap" style="min-width:100px;display:none"><lbl>연도</lbl><input type="number" id="st2-year" min="2024" max="2099" style="width:90px"></div>
+        <div class="cg" style="min-width:120px"><lbl>업체</lbl>
+          <select id="st2-biz">
+            <option value="">전체</option>
+          </select>
+        </div>
+        <button class="btn bp bsm" id="st2-query">📊 조회</button>
+        <button class="btn be bsm" id="st2-csv">📥 CSV</button>
       </div>
     </div>
-    <div class="cards" id="st-cards" style="display:none"></div>
-    <div class="sec" id="st-compare" style="display:none">
-      <div class="sec-t">🏢 업체별 비교</div>
-      <div id="st-biz-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+    <!-- 요약 카드 -->
+    <div class="cards" id="st2-cards" style="display:none;margin-bottom:12px;"></div>
+
+    <!-- 차트 -->
+    <div class="sec" id="st2-chart-sec" style="display:none">
+      <div class="sec-t" id="st2-chart-title">📊 차트</div>
+      <div class="cw"><canvas id="st2-canvas"></canvas></div>
     </div>
+
+    <!-- 테이블 -->
+    <div class="sec" id="st2-table-sec" style="display:none">
+      <div class="sec-t" id="st2-table-title">📋 상세 데이터</div>
+      <div style="overflow-x:auto"><table id="st2-table" style="width:100%;border-collapse:collapse;font-size:12px;"></table></div>
+    </div>
+
+    <!-- 기존 히트맵 (월별 뷰에서만) -->
     <div class="sec" id="st-hmap" style="display:none">
       <div class="sec-t">🔥 시간대별 히트맵</div>
       <div class="htabs" id="hmap-tabs"></div>
@@ -353,12 +380,8 @@ canvas{display:block;}
         <div class="hmap-in"><div class="hmap-xl" id="hmap-x"></div><div class="hmap-rows" id="hmap-g"></div></div>
       </div>
     </div>
-    <div class="sec" id="st-line" style="display:none">
-      <div class="sec-t">📈 시간대별 평균</div>
-      <div class="htabs" id="line-tabs"></div>
-      <div class="cw"><canvas id="line-c"></canvas></div>
-    </div>
-    <div class="empty" id="st-empty"><div class="ei">📊</div><p>조회 월을 선택하고 조회 버튼을 누르세요</p></div>
+
+    <div class="empty" id="st2-empty"><div class="ei">📊</div><p>조건을 선택하고 조회 버튼을 누르세요</p></div>
   </div>
 </div>
 
@@ -1170,6 +1193,7 @@ document.querySelectorAll('.tab').forEach(function(btn){
     ['monitor','stats','sales','map','settings','sub','admin'].forEach(function(t){
       document.getElementById('tab-'+t).style.display=t===tab?'':'none';
     });
+    if(tab==='stats') { initSt2BizSelect(); document.getElementById('st2-year').value=new Date().getFullYear(); }
     if(tab==='sales')initSalesTab();
     if(tab==='settings')renderBizList();
     if(tab==='admin'){
@@ -1204,137 +1228,181 @@ function saveStats(){
   });
 }
 
-// ── 통계 ───────────────────────────────────────────
+
+// ── 통계2 (일별/시간대별/월별/연별) ────────────────
 function getMonthDays(month){var ym=month.split('-').map(Number);var dim=new Date(ym[0],ym[1],0).getDate();var days=[];for(var d=1;d<=dim;d++)days.push(month+'-'+pad(d));return days;}
 function getHours(){var h=[];for(var i=0;i<24;i++)h.push(i);return h;}
-function hColor(val,max){if(!val||val===0)return '#0d1525';if(max===0)return '#0d1525';var r=val/max;var stops=['#0d2a4a','#0a4070','#0066aa','#00aaff','#00d4ff','#00ff88'];return stops[Math.min(Math.floor(r*stops.length),stops.length-1)];}
+var st2View = 'day';
+var st2ChartData = null;
 
-document.getElementById('st-calc').addEventListener('click',function(){
-  var month=document.getElementById('st-month').value;
-  if(!month){alert('조회 월을 선택해주세요');return;}
-  var days=getMonthDays(month),hours=getHours();
-  var d={};try{d=JSON.parse(localStorage.getItem('ps_'+month)||'{}');}catch(e){}
-  var bizData={};
-  G.bizList.forEach(function(b){var bd={};try{bd=JSON.parse(localStorage.getItem('psb_'+b.id+'_'+month)||'{}');}catch(e){}bizData[b.id]=bd;});
-  var hasData=Object.keys(d).length>0||G.bizList.some(function(b){return Object.keys(bizData[b.id]).length>0;});
-  document.getElementById('st-empty').style.display=hasData?'none':'';
-  ['st-cards','st-compare','st-hmap','st-line'].forEach(function(id){document.getElementById(id).style.display=hasData?'':'none';});
-  if(!hasData)return;
-  var ts=0,tn=0,gMax=0,pkH=0,pkD='-';
-  days.forEach(function(day){if(!d[day])return;hours.forEach(function(h){var s=d[day][h];if(!s||!s.n)return;var avg=s.on/s.n;ts+=avg;tn++;if(avg>gMax){gMax=avg;pkH=h;pkD=day.slice(5);}});});
-  var gavg=tn>0?(ts/tn).toFixed(1):0;
-  document.getElementById('st-cards').innerHTML=
-    '<div class="card"><div class="card-l">데이터 일수</div><div class="card-v c-ac">'+Object.keys(d).length+'일</div></div>'+
-    '<div class="card"><div class="card-l">평균 온라인</div><div class="card-v c-warn">'+gavg+'명</div></div>'+
-    '<div class="card"><div class="card-l">최대 온라인</div><div class="card-v c-ac2">'+gMax.toFixed(1)+'명</div></div>'+
-    '<div class="card"><div class="card-l">피크 시간</div><div class="card-v c-ac" style="font-size:16px">'+pkD+' '+pkH+'시</div></div>';
-  var compHtml='';
-  G.bizList.forEach(function(b){
-    var bd=bizData[b.id]||{};var bs=0,bn=0,bMax=0,bPkH=0,bPkD='-';
-    days.forEach(function(day){if(!bd[day])return;hours.forEach(function(h){var s=bd[day][h];if(!s||!s.n)return;var avg=s.on/s.n;bs+=avg;bn++;if(avg>bMax){bMax=avg;bPkH=h;bPkD=day.slice(5);}});});
-    var bavg=bn>0?(bs/bn).toFixed(1):0;
-    compHtml+='<div style="background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px;">'
-      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:'+b.color+'"></div><span style="font-size:13px;font-weight:700">'+esc(b.name)+'</span></div>'
-      +'<div style="font-size:20px;font-weight:700;color:'+b.color+'">'+bavg+'<span style="font-size:12px;color:var(--tx2)"> 평균</span></div>'
-      +'<div style="height:4px;background:var(--bg4);border-radius:2px;margin:5px 0"><div style="height:100%;width:'+Math.min(100,parseFloat(bavg)/Math.max(parseFloat(gavg),1)*100)+'%;background:'+b.color+';border-radius:2px"></div></div>'
-      +'<div style="font-size:10px;color:var(--tx2)">최대 '+bMax.toFixed(1)+'명 · 피크 '+bPkD+' '+bPkH+'시</div></div>';
+// 뷰 버튼
+document.querySelectorAll('.st-view-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    st2View = btn.dataset.view;
+    document.querySelectorAll('.st-view-btn').forEach(function(b){ b.className='btn bg bsm st-view-btn'; });
+    btn.className = 'btn bp bsm st-view-btn';
+    // 입력 필드 토글
+    document.getElementById('st2-date-wrap').style.display  = st2View==='day' ? '' : 'none';
+    document.getElementById('st2-month-wrap').style.display = (st2View==='month'||st2View==='hourly') ? '' : 'none';
+    document.getElementById('st2-year-wrap').style.display  = st2View==='year' ? '' : 'none';
+    document.getElementById('st-hmap').style.display = 'none';
   });
-  document.getElementById('st-biz-grid').innerHTML=compHtml||'<div style="color:var(--tx2);font-size:12px">데이터 없음</div>';
-  var hmapTabEl=document.getElementById('hmap-tabs');hmapTabEl.innerHTML='';
-  var allBtn=document.createElement('button');allBtn.className='htab on';allBtn.textContent='전체';
-  allBtn.style.cssText='background:rgba(0,212,255,.1);border-color:var(--ac);color:var(--ac)';
-  allBtn.addEventListener('click',function(){G.hmapBizId='all';hmapTabEl.querySelectorAll('.htab').forEach(function(b){b.classList.remove('on');});allBtn.classList.add('on');drawHeatmap(days,hours,'all',d,bizData);});
-  hmapTabEl.appendChild(allBtn);
-  G.bizList.forEach(function(b){
-    var btn=document.createElement('button');btn.className='htab';btn.textContent=b.name;
-    btn.style.cssText='background:'+b.color+'22;border-color:'+b.color+';color:'+b.color;
-    btn.addEventListener('click',function(){G.hmapBizId=b.id;hmapTabEl.querySelectorAll('.htab').forEach(function(x){x.classList.remove('on');});btn.classList.add('on');drawHeatmap(days,hours,b.id,d,bizData);});
-    hmapTabEl.appendChild(btn);
-  });
-  drawHeatmap(days,hours,'all',d,bizData);
-  G.lineSelIds=G.bizList.map(function(b){return b.id;});
-  var lineTabEl=document.getElementById('line-tabs');lineTabEl.innerHTML='';
-  var allLBtn=document.createElement('button');allLBtn.className='htab on';allLBtn.textContent='전체';
-  allLBtn.style.cssText='background:rgba(0,212,255,.1);border-color:var(--ac);color:var(--ac)';
-  allLBtn.addEventListener('click',function(){G.lineSelIds=G.bizList.map(function(b){return b.id;});lineTabEl.querySelectorAll('.htab').forEach(function(b){b.classList.add('on');});drawLineChart(days,hours,d,bizData);});
-  lineTabEl.appendChild(allLBtn);
-  G.bizList.forEach(function(b){
-    var btn=document.createElement('button');btn.className='htab on';btn.textContent=b.name;
-    btn.style.cssText='background:'+b.color+'22;border-color:'+b.color+';color:'+b.color;
-    btn.addEventListener('click',function(){var i=G.lineSelIds.indexOf(b.id);if(i>=0)G.lineSelIds.splice(i,1);else G.lineSelIds.push(b.id);btn.classList.toggle('on');drawLineChart(days,hours,d,bizData);});
-    lineTabEl.appendChild(btn);
-  });
-  drawLineChart(days,hours,d,bizData);
 });
 
-function drawHeatmap(days,hours,bizId,d,bizData){
-  var src=bizId==='all'?d:(bizData[bizId]||{});
-  var gMax=0;var matrix={};
-  hours.forEach(function(h){matrix[h]={};days.forEach(function(day){var s=src[day]&&src[day][h];var v=(s&&s.n>0)?s.on/s.n:null;matrix[h][day]=v;if(v&&v>gMax)gMax=v;});});
-  document.getElementById('hmap-x').innerHTML=days.map(function(d){return '<div class="hmap-xlb">'+parseInt(d.slice(8))+'</div>';}).join('');
-  document.getElementById('hmap-y').innerHTML=hours.map(function(h){return '<div class="hmap-ylb">'+h+'시</div>';}).join('');
-  var tip=document.getElementById('tip');
-  document.getElementById('hmap-g').innerHTML=hours.map(function(h){
-    return '<div class="hmap-row">'+days.map(function(day){
-      var v=matrix[h][day],color=hColor(v,gMax);
-      var lbl=day.slice(5)+' '+h+'시: '+(v!==null?v.toFixed(1)+'명':'없음');
-      return '<div class="hcell" style="background:'+color+'" data-tip="'+esc(lbl)+'"></div>';
-    }).join('')+'</div>';
-  }).join('');
-  document.getElementById('hmap-g').querySelectorAll('.hcell').forEach(function(cell){
-    cell.addEventListener('click',function(){tip.style.display='block';tip.textContent=cell.dataset.tip;tip.style.left='50%';tip.style.top='50%';tip.style.transform='translate(-50%,-50%)';setTimeout(function(){tip.style.display='none';},2000);});
+// 업체 선택 초기화
+function initSt2BizSelect(){
+  var sel = document.getElementById('st2-biz');
+  sel.innerHTML = '<option value="">전체</option>';
+  G.bizList.forEach(function(b){
+    var opt = document.createElement('option');
+    opt.value = b.id; opt.textContent = b.name;
+    sel.appendChild(opt);
   });
 }
 
-function drawLineChart(days,hours,d,bizData){
-  var canvas=document.getElementById('line-c');
-  var W=canvas.parentElement.clientWidth||320,H=140,dpr=window.devicePixelRatio||1;
-  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
-  var ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
-  var pL=38,pR=10,pT=18,pB=24,cW=W-pL-pR,cH=H-pT-pB;
-  var series=[];
-  var allAvg=hours.map(function(h){var s=0,n=0;days.forEach(function(day){var sl=d[day]&&d[day][h];if(sl&&sl.n>0){s+=sl.on/sl.n;n++;}});return n>0?s/n:0;});
-  series.push({name:'전체',color:'#ffffff',vals:allAvg,dash:true});
-  G.bizList.forEach(function(b){
-    if(G.lineSelIds.indexOf(b.id)<0)return;
-    var bd=bizData[b.id]||{};
-    var bAvg=hours.map(function(h){var s=0,n=0;days.forEach(function(day){var sl=bd[day]&&bd[day][h];if(sl&&sl.n>0){s+=sl.on/sl.n;n++;}});return n>0?s/n:0;});
-    series.push({name:b.name,color:b.color,vals:bAvg,dash:false});
+// 조회 버튼
+document.getElementById('st2-query').addEventListener('click', function(){
+  var bizId = document.getElementById('st2-biz').value;
+  var url = '';
+  if(st2View==='day'){
+    var date = document.getElementById('st2-date').value;
+    if(!date){alert('날짜를 선택해주세요');return;}
+    url = '/api/stats2/day/'+date+(bizId?'?bizId='+bizId:'');
+  } else if(st2View==='hourly'){
+    var month = document.getElementById('st2-month').value;
+    if(!month){alert('월을 선택해주세요');return;}
+    url = '/api/stats2/hourly/'+month+(bizId?'?bizId='+bizId:'');
+  } else if(st2View==='month'){
+    var month = document.getElementById('st2-month').value;
+    if(!month){alert('월을 선택해주세요');return;}
+    url = '/api/stats2/month/'+month+(bizId?'?bizId='+bizId:'');
+  } else if(st2View==='year'){
+    var year = document.getElementById('st2-year').value;
+    if(!year){alert('연도를 입력해주세요');return;}
+    url = '/api/stats2/year/'+year+(bizId?'?bizId='+bizId:'');
+  }
+  authFetch(url).then(function(r){return r.json();}).then(function(data){
+    st2ChartData = data;
+    renderSt2(data);
+  }).catch(function(e){ alert('조회 실패: '+e.message); });
+});
+
+function renderSt2(data){
+  var keys = Object.keys(data).sort();
+  var hasData = keys.length > 0;
+  document.getElementById('st2-empty').style.display = hasData ? 'none' : '';
+  document.getElementById('st2-cards').style.display = hasData ? '' : 'none';
+  document.getElementById('st2-chart-sec').style.display = hasData ? '' : 'none';
+  document.getElementById('st2-table-sec').style.display = hasData ? '' : 'none';
+  document.getElementById('st-hmap').style.display = 'none';
+  if(!hasData) return;
+
+  // 요약 카드
+  var totalOn=0, totalN=0, maxOn=0, maxKey='-';
+  keys.forEach(function(k){
+    var s=data[k];
+    var avg = s.n>0 ? s.on/s.n : 0;
+    totalOn += avg; totalN++;
+    if(avg > maxOn){maxOn=avg; maxKey=k;}
   });
-  var maxV=1;series.forEach(function(s){s.vals.forEach(function(v){if(v>maxV)maxV=v;});});
+  var avgOn = totalN>0 ? (totalOn/totalN).toFixed(1) : 0;
+
+  var keyLabel = st2View==='day'?'시간대수':st2View==='hourly'?'시간대':st2View==='month'?'데이터 일수':'월수';
+  var peakLabel = st2View==='day'?(maxKey+'시'):st2View==='hourly'?(maxKey+'시'):st2View==='month'?maxKey.slice(5)+'일':maxKey;
+
+  document.getElementById('st2-cards').innerHTML =
+    '<div class="card"><div class="card-l">'+keyLabel+'</div><div class="card-v c-ac">'+keys.length+'</div></div>'+
+    '<div class="card"><div class="card-l">평균 온라인</div><div class="card-v c-warn">'+avgOn+'명</div></div>'+
+    '<div class="card"><div class="card-l">최대 온라인</div><div class="card-v c-ac2">'+maxOn.toFixed(1)+'명</div></div>'+
+    '<div class="card"><div class="card-l">피크</div><div class="card-v c-ac" style="font-size:15px">'+peakLabel+'</div></div>';
+
+  // 차트 제목
+  var titles = {day:'📅 시간대별 온라인 수', hourly:'⏰ 시간대별 평균', month:'📆 일별 온라인 수', year:'🗓 월별 온라인 수'};
+  document.getElementById('st2-chart-title').textContent = titles[st2View];
+  document.getElementById('st2-table-title').textContent = titles[st2View].replace('📅','📋').replace('⏰','📋').replace('📆','📋').replace('🗓','📋') + ' 상세';
+
+  // 차트 그리기
+  drawSt2Chart(keys, data);
+
+  // 테이블
+  var thead = '<thead><tr style="border-bottom:1px solid var(--bd)">';
+  thead += '<th style="padding:6px 8px;text-align:left;color:var(--tx2);font-size:11px">'+(st2View==='day'||st2View==='hourly'?'시간':'기간')+'</th>';
+  thead += '<th style="padding:6px 8px;text-align:right;color:var(--tx2);font-size:11px">평균 온라인</th>';
+  thead += '<th style="padding:6px 8px;text-align:right;color:var(--tx2);font-size:11px">샘플수</th>';
+  thead += '<th style="padding:6px 8px;text-align:right;color:var(--tx2);font-size:11px">가동률</th>';
+  thead += '</tr></thead>';
+  var tbody = '<tbody>';
+  keys.forEach(function(k){
+    var s=data[k];
+    var avg = s.n>0?(s.on/s.n).toFixed(1):'-';
+    var rate = s.tot>0?Math.round(s.on/s.tot*100)+'%':'-';
+    var label = (st2View==='day'||st2View==='hourly') ? k+'시' : st2View==='month' ? k.slice(5)+'일' : k;
+    var isMax = k===maxKey;
+    tbody += '<tr style="border-bottom:1px solid var(--bg3)'+(isMax?';background:rgba(0,212,255,.05)':'')+'">';
+    tbody += '<td style="padding:5px 8px;font-size:12px;color:'+(isMax?'var(--ac)':'var(--tx)')+'">'+label+(isMax?' ⭐':'')+'</td>';
+    tbody += '<td style="padding:5px 8px;text-align:right;font-size:12px;color:var(--ac2)">'+avg+'</td>';
+    tbody += '<td style="padding:5px 8px;text-align:right;font-size:12px;color:var(--tx2)">'+s.n+'</td>';
+    tbody += '<td style="padding:5px 8px;text-align:right;font-size:12px;color:var(--warn)">'+rate+'</td>';
+    tbody += '</tr>';
+  });
+  tbody += '</tbody>';
+  document.getElementById('st2-table').innerHTML = thead + tbody;
+}
+
+function drawSt2Chart(keys, data){
+  var canvas = document.getElementById('st2-canvas');
+  var W = canvas.parentElement.clientWidth||320, H=180, dpr=window.devicePixelRatio||1;
+  canvas.width=W*dpr; canvas.height=H*dpr; canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  var ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  var pL=38,pR=10,pT=20,pB=30,cW=W-pL-pR,cH=H-pT-pB;
+  var vals = keys.map(function(k){ var s=data[k]; return s.n>0?s.on/s.n:0; });
+  var maxV = Math.max.apply(null,vals)||1;
+
   ctx.clearRect(0,0,W,H);
-  ctx.strokeStyle='#1e3a5f';ctx.lineWidth=1;
-  [0,.5,1].forEach(function(r){var y=pT+cH*(1-r);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(pL+cW,y);ctx.stroke();ctx.fillStyle='#94a3b8';ctx.font='9px monospace';ctx.textAlign='right';ctx.fillText(Math.round(maxV*r),pL-3,y+3);});
-  ctx.fillStyle='#94a3b8';ctx.font='9px monospace';ctx.textAlign='center';
-  hours.forEach(function(h,i){if(h%6===0){var x=pL+(i/(hours.length-1))*cW;ctx.fillText(h+'시',x,H-6);}});
-  var lx=pL;
-  series.forEach(function(s){ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.dash?1:1.5;ctx.setLineDash(s.dash?[3,3]:[]);ctx.moveTo(lx,12);ctx.lineTo(lx+12,12);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=s.color;ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(s.name,lx+15,14);lx+=ctx.measureText(s.name).width+30;});
-  series.forEach(function(s){
-    ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.dash?1:1.5;ctx.setLineDash(s.dash?[3,3]:[]);ctx.lineJoin='round';
-    hours.forEach(function(h,i){var x=pL+(i/(hours.length-1))*cW,y=pT+cH*(1-s.vals[i]/maxV);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
-    ctx.stroke();ctx.setLineDash([]);
+  // 그리드
+  [0,0.25,0.5,0.75,1].forEach(function(r){
+    var y=pT+cH*(1-r);
+    ctx.strokeStyle='#1e3a5f'; ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.moveTo(pL,y); ctx.lineTo(pL+cW,y); ctx.stroke();
+    ctx.fillStyle='#64748b'; ctx.font='9px monospace'; ctx.textAlign='right';
+    ctx.fillText(Math.round(maxV*r), pL-4, y+3);
+  });
+
+  var bw = Math.max(2, cW/keys.length - 2);
+  keys.forEach(function(k,i){
+    var v=vals[i];
+    var x=pL+(i/keys.length)*cW+(cW/keys.length-bw)/2;
+    var bh=Math.max(1,(v/maxV)*cH);
+    var y=pT+cH-bh;
+    var r=v/maxV;
+    var color=r>0.7?'#00ff88':r>0.4?'#00d4ff':'#0066aa';
+    ctx.fillStyle=color+'cc';
+    ctx.fillRect(x,y,bw,bh);
+    // x축 라벨
+    if(keys.length<=12 || i%Math.ceil(keys.length/12)===0){
+      ctx.fillStyle='#64748b'; ctx.font='8px monospace'; ctx.textAlign='center';
+      var lbl = (st2View==='day'||st2View==='hourly')?k+'시':st2View==='month'?k.slice(5)+'일':k.slice(5);
+      ctx.fillText(lbl, x+bw/2, H-6);
+    }
   });
 }
 
-document.getElementById('st-csv').addEventListener('click',function(){
-  var month=document.getElementById('st-month').value;if(!month){alert('먼저 조회해주세요');return;}
-  var days=getMonthDays(month);
-  var rows=[['업체','시간대'].concat(days.map(function(d){return d.slice(5);}))];
-  G.bizList.forEach(function(b){
-    var bd={};try{bd=JSON.parse(localStorage.getItem('psb_'+b.id+'_'+month)||'{}');}catch(e){}
-    for(var h=0;h<24;h++){var row=[b.name,h+'시'];days.forEach(function(day){var s=bd[day]&&bd[day][h];row.push(s&&s.n>0?(s.on/s.n).toFixed(1):'');});rows.push(row);}
+// CSV 다운로드
+document.getElementById('st2-csv').addEventListener('click', function(){
+  if(!st2ChartData){alert('먼저 조회해주세요');return;}
+  var keys=Object.keys(st2ChartData).sort();
+  var rows=[['기간','평균온라인','샘플수','가동률']];
+  keys.forEach(function(k){
+    var s=st2ChartData[k];
+    var avg=s.n>0?(s.on/s.n).toFixed(1):0;
+    var rate=s.tot>0?Math.round(s.on/s.tot*100)+'%':'-';
+    rows.push([k,avg,s.n,rate]);
   });
-  dlCSV(rows,'stats_'+month+'.csv');
-});
-document.getElementById('st-del').addEventListener('click',function(){
-  var month=document.getElementById('st-month').value;if(!month){alert('월을 선택해주세요');return;}
-  if(!confirm(month+' 데이터를 삭제할까요?'))return;
-  localStorage.removeItem('ps_'+month);
-  G.bizList.forEach(function(b){localStorage.removeItem('psb_'+b.id+'_'+month);});
-  document.getElementById('st-calc').click();
+  dlCSV(rows,'stats_'+st2View+'_'+new Date().toISOString().slice(0,10)+'.csv');
 });
 
 // ── 매출 ───────────────────────────────────────────
+
 function getSetting(bizId){var def={price:1500,seats:0,cost:0};try{return Object.assign({},def,JSON.parse(localStorage.getItem('ss_'+bizId)||'{}'));}catch(e){return def;}}
 function saveSetting(bizId,s){try{localStorage.setItem('ss_'+bizId,JSON.stringify(s));}catch(e){}}
 function renderSalesSettings(){
@@ -1495,7 +1563,7 @@ document.getElementById('cr-apply').addEventListener('click',function(){
 
 window.addEventListener('resize',function(){
   if(document.getElementById('tab-stats').style.display!=='none'){
-    var m=document.getElementById('st-month').value;if(m)document.getElementById('st-calc').click();
+    if(st2ChartData) renderSt2(st2ChartData);
   }
 });
 
@@ -1973,7 +2041,9 @@ document.querySelectorAll('.tab[data-tab]').forEach(function(tab) {
 
 
 var m=monthStr();
-document.getElementById('st-month').value=m;
+document.getElementById('st2-month').value=m;
+document.getElementById('st2-date').value=new Date().toISOString().slice(0,10);
+document.getElementById('st2-year').value=new Date().getFullYear();
 document.getElementById('sa-month').value=m;
 // 자동검색 OFF 버튼 기본 선택
 document.querySelector('[data-auto="off"]').classList.add('on');

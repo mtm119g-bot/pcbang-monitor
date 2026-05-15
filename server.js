@@ -385,6 +385,71 @@ app.delete('/api/stats/:month', auth, async (req, res) => {
   res.json({ok:true});
 });
 
+// 통계 - 일별 (특정 날짜의 시간대별)
+app.get('/api/stats2/day/:date', auth, async (req, res) => {
+  try {
+    const bizId = req.query.bizId || null;
+    const query = {userId:req.user.id, date:req.params.date, bizId: bizId ? new mongoose.Types.ObjectId(bizId) : null};
+    const stats = await Stats.find(query).sort({hour:1});
+    const r = {};
+    stats.forEach(s => { r[s.hour] = {on:s.onCount, tot:s.totalCount, n:s.sampleCount}; });
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+// 통계 - 월별 (특정 월의 일별 합계)
+app.get('/api/stats2/month/:month', auth, async (req, res) => {
+  try {
+    const bizId = req.query.bizId || null;
+    const query = {userId:req.user.id, date:{$regex:'^'+req.params.month}, bizId: bizId ? new mongoose.Types.ObjectId(bizId) : null};
+    const stats = await Stats.find(query);
+    const r = {};
+    stats.forEach(s => {
+      if(!r[s.date]) r[s.date] = {on:0, tot:0, n:0};
+      r[s.date].on += s.onCount;
+      r[s.date].tot += s.totalCount;
+      r[s.date].n += s.sampleCount;
+    });
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+// 통계 - 연별 (특정 연도의 월별 합계)
+app.get('/api/stats2/year/:year', auth, async (req, res) => {
+  try {
+    const bizId = req.query.bizId || null;
+    const query = {userId:req.user.id, date:{$regex:'^'+req.params.year}, bizId: bizId ? new mongoose.Types.ObjectId(bizId) : null};
+    const stats = await Stats.find(query);
+    const r = {};
+    stats.forEach(s => {
+      const month = s.date.substring(0,7);
+      if(!r[month]) r[month] = {on:0, tot:0, n:0};
+      r[month].on += s.onCount;
+      r[month].tot += s.totalCount;
+      r[month].n += s.sampleCount;
+    });
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+// 통계 - 시간대별 전체 평균 (특정 월)
+app.get('/api/stats2/hourly/:month', auth, async (req, res) => {
+  try {
+    const bizId = req.query.bizId || null;
+    const query = {userId:req.user.id, date:{$regex:'^'+req.params.month}, bizId: bizId ? new mongoose.Types.ObjectId(bizId) : null};
+    const stats = await Stats.find(query);
+    const r = {};
+    for(let h=0; h<24; h++) r[h] = {on:0, tot:0, n:0};
+    stats.forEach(s => {
+      r[s.hour].on += s.onCount;
+      r[s.hour].tot += s.totalCount;
+      r[s.hour].n += s.sampleCount;
+    });
+    res.json(r);
+  } catch(e) { res.status(500).json({error:e.message}); }
+});
+
+
 // GeoIP
 app.get('/api/geoip/:ip', auth, async (req, res) => {
   try {

@@ -18,7 +18,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'pcbang-monitor-secret-2024';
 const PORT = process.env.PORT || 3000;
 
 mongoose.connect(MONGO_URL)
-  .then(() => console.log('MongoDB 연결 성공'))
+  .then(() => {
+    console.log('MongoDB 연결 성공');
+    checkExpiredSubs();
+    setInterval(checkExpiredSubs, 1000 * 60 * 60);
+  })
   .catch(err => console.error('MongoDB 연결 실패:', err));
 
 // ── 스키마 ─────────────────────────────────────────
@@ -589,10 +593,6 @@ async function checkExpiredSubs() {
     console.log(`구독 만료 처리: userId=${sub.userId}`);
   }
 }
-setInterval(checkExpiredSubs, 1000 * 60 * 60); // 1시간마다 체크
-checkExpiredSubs();
-
-
 
 // 토스페이먼츠 결제 성공/실패 리다이렉트
 app.get('/payment/success', (req, res) => {

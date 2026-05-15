@@ -17,9 +17,9 @@ const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017';
 const JWT_SECRET = process.env.JWT_SECRET || 'pcbang-monitor-secret-2024';
 const PORT = process.env.PORT || 3000;
 
-mongoose.connect(MONGO_URL)
+mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 5000 })
   .then(() => {
-    console.log('MongoDB 연결 성공');
+    console.log('MongoDB 연결 성공:', MONGO_URL.substring(0, 30) + '...');
     // 자동스캔 복원
     setTimeout(async () => {
       try {
@@ -34,7 +34,11 @@ mongoose.connect(MONGO_URL)
     checkExpiredSubs();
     setInterval(checkExpiredSubs, 1000 * 60 * 60);
   })
-  .catch(err => console.error('MongoDB 연결 실패:', err));
+  .catch(err => {
+    console.error('MongoDB 연결 실패 - MONGO_URL:', MONGO_URL.substring(0, 30));
+    console.error('연결 오류:', err.message);
+    // 서버는 계속 실행 (API는 DB 오류 반환)
+  });
 
 // ── 스키마 ─────────────────────────────────────────
 const userSchema = new mongoose.Schema({
@@ -110,6 +114,12 @@ function auth(req, res, next) {
 }
 function adminAuth(req, res, next) {
   if (req.user.role !== 'admin') return res.status(403).json({ error: '관리자 권한이 필요합니다' });
+  next();
+}
+function dbCheck(req, res, next) {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'DB 연결 중입니다. 잠시 후 다시 시도해주세요.' });
+  }
   next();
 }
 
@@ -263,7 +273,7 @@ function setAutoScan(userId, intervalMs) {
 // ══════════════════════════════════════════════════
 
 // 회원가입
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', dbCheck, async (req, res) => {
   try {
     const {username, password, name} = req.body;
     if (!username||!password||!name) return res.status(400).json({error:'모든 항목을 입력해주세요'});
@@ -281,7 +291,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // 로그인
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', dbCheck, async (req, res) => {
   try {
     const {username, password} = req.body;
     if (!username||!password) return res.status(400).json({error:'아이디와 비밀번호를 입력해주세요'});

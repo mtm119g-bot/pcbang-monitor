@@ -17,28 +17,6 @@ const MONGO_URL = process.env.MONGO_URL || 'mongodb://mongo:27017';
 const JWT_SECRET = process.env.JWT_SECRET || 'pcbang-monitor-secret-2024';
 const PORT = process.env.PORT || 3000;
 
-mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 5000 })
-  .then(() => {
-    console.log('MongoDB 연결 성공:', MONGO_URL.substring(0, 30) + '...');
-    // 자동스캔 복원
-    setTimeout(async () => {
-      try {
-        const settings = await AutoScan.find({ enabled: true });
-        console.log(`자동스캔 복원: ${settings.length}개 사용자`);
-        for (const s of settings) {
-          setAutoScan(String(s.userId), s.intervalMs);
-        }
-      } catch(e) { console.error('자동스캔 복원 실패:', e); }
-    }, 1000);
-    // 구독 만료 체크
-    checkExpiredSubs();
-    setInterval(checkExpiredSubs, 1000 * 60 * 60);
-  })
-  .catch(err => {
-    console.error('MongoDB 연결 실패 - MONGO_URL:', MONGO_URL.substring(0, 30));
-    console.error('연결 오류:', err.message);
-    // 서버는 계속 실행 (API는 DB 오류 반환)
-  });
 
 // ── 스키마 ─────────────────────────────────────────
 const userSchema = new mongoose.Schema({
@@ -602,4 +580,27 @@ app.get('/payment/fail', (req, res) => {
 app.get('/api/health', (req, res) => res.json({ok:true, db:mongoose.connection.readyState===1?'connected':'disconnected'}));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-server.listen(PORT, () => console.log(`서버 실행: http://localhost:${PORT}`));
+// ── MongoDB 연결 및 서버 시작 ───────────────────────
+mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 10000 })
+  .then(() => {
+    console.log('MongoDB 연결 성공:', MONGO_URL.substring(0, 40));
+    // 자동스캔 복원
+    setTimeout(async () => {
+      try {
+        const settings = await AutoScan.find({ enabled: true });
+        console.log(`자동스캔 복원: ${settings.length}개 사용자`);
+        for (const s of settings) { setAutoScan(String(s.userId), s.intervalMs); }
+      } catch(e) { console.error('자동스캔 복원 실패:', e.message); }
+    }, 2000);
+    // 구독 만료 체크
+    setTimeout(() => {
+      checkExpiredSubs();
+      setInterval(checkExpiredSubs, 1000 * 60 * 60);
+    }, 3000);
+    server.listen(PORT, () => console.log(`서버 실행: http://localhost:${PORT}`));
+  })
+  .catch(err => {
+    console.error('MongoDB 연결 실패:', err.message);
+    console.error('MONGO_URL:', MONGO_URL);
+    process.exit(1);
+  });

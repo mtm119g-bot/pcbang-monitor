@@ -1064,7 +1064,6 @@ document.getElementById('btn-start').addEventListener('click',function(){
         G.bizSeq=G.bizList.length;
         renderBizList();
       }
-      saveBizToServer();requestServerScan();
       buildHosts();
       if(!G.hosts.length){alert('설정 탭에서 IP를 입력하고 저장해주세요!');return;}
       G.running=true;
@@ -1075,15 +1074,11 @@ document.getElementById('btn-start').addEventListener('click',function(){
       var lbl=document.getElementById('iv').options[document.getElementById('iv').selectedIndex].text;
       var badge=document.getElementById('iv-badge');
       badge.style.display='';badge.innerHTML='<span class="badge">'+lbl+' 자동</span>';
-      // 서버에 즉시 스캔 요청
       requestServerScan();
-      // 즉시 결과 조회 시작
       fetchResults();
-      // 5초마다 결과 폴링
       G.ivId = setInterval(function(){
         fetchResults();
       }, 5000);
-      // 카운트다운 시작
       startCD(iv);
     });
 });

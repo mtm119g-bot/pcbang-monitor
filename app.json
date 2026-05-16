@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "PC방 모니터",
+    "slug": "pcbang-monitor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080c18"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pcbang.monitor",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "지도에서 현재 위치를 표시하기 위해 위치 정보가 필요합니다."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080c18"
+      },
+      "package": "com.pcbang.monitor",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-secure-store"
+    ]
+  }
+}
